@@ -1,0 +1,51 @@
+syntax = "proto3";
+package master;
+
+message Address {
+  string replica = 1;
+  uint32 partition = 2;
+  string ip = 3;
+  uint32 port = 4;
+}
+
+message Register {
+  string replicaId = 1;
+  string ip = 2;
+  uint32 localPort = 3;
+  uint32 remotePort = 4;
+}
+
+message RegisterReply {
+  uint32 partition = 1;
+  Address leader = 2;
+  repeated Address siblings = 3;
+  repeated Address localNodes = 4;
+}
+
+message GetNodesReply {
+  repeated Address nodes = 1;
+}
+
+message Request {
+  uint32 seq = 1;
+  oneof payload {
+    // Each server node registers on startup. Once every node has called `registerNode`,
+    // the master delivers the information needed for all nodes to operate
+    Register registerNode = 2;
+
+    // Called by any node or client
+    uint32 getPartitionLeader = 3;
+
+    // Called by clients, used to learn the topology of the local replica
+    string getReplicaNodes = 4;
+  }
+}
+
+message Response {
+  uint32 seq = 1;
+  oneof payload {
+    RegisterReply registerReply = 2;
+    Address getPartitionLeaderReply = 3;
+    GetNodesReply getReplicaNodesReply = 4;
+  }
+}

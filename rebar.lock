@@ -1,0 +1,19 @@
+{"1.2.0",
+[{<<"foil">>,{pkg,<<"foil">>,<<"0.1.1">>},1},
+ {<<"metal">>,{pkg,<<"metal">>,<<"0.1.1">>},1},
+ {<<"quickrand">>,
+  {git,"https://github.com/okeuday/quickrand.git",
+       {ref,"b189accc1686a95b0ff1478521b21a65e372a614"}},
+  1},
+ {<<"shackle">>,
+  {git,"https://github.com/ergl/shackle.git",
+       {ref,"40521de15b467022618047a765bce64f048a94c9"}},
+  0}]}.
+[
+{pkg_hash,[
+ {<<"foil">>, <<"4D07B62C114636BBC3EEBD5CEE04B23A7AAB1262B0F68AA79005A6FBC3790472">>},
+ {<<"metal">>, <<"5D3D1322DA7BCD34B94FED5486F577973685298883954F7A3E517EF5EF6953F5">>}]},
+{pkg_hash_ext,[
+ {<<"foil">>, <<"CD5F4B6D518168E97D0F8A5D79EEE4D3625EEF1ED33790BA037ACCAD22C7F455">>},
+ {<<"metal">>, <<"88B82B634998A1A768DEDCD372C2F7E657B19445325C0AF5CCBAC62C77210F1D">>}]}
+].
