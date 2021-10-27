@@ -164,4 +164,9 @@ sync_update(Coord, Tx, Key, Value) ->
 %% TODO(borja): Rethink
 -spec make_id(binary(), binary(), non_neg_integer(), non_neg_integer()) -> binary().
 make_id(ReplicaId, Ip, LocalId, Id) ->
-    term_to_binary({ReplicaId, Ip, LocalId, Id}).
+    <<
+        ReplicaId/binary,
+        Ip/binary,
+        (integer_to_binary(LocalId))/binary,
+        (integer_to_binary(Id))/binary
+    >>.

@@ -12,7 +12,7 @@ message LoadReply {}
 message Read {
   // If empty, this is the first request at the partition
   optional bytes prevLeader = 1;
-  bytes txId = 2;
+  string txId = 2;
   uint64 timestamp = 3;
   bytes key = 4;
 }
@@ -27,7 +27,7 @@ message ReadReply {
 message Update {
   // If empty, this is the first request at the partition
   optional bytes prevLeader = 1;
-  bytes txId = 2;
+  string txId = 2;
   uint64 timestamp = 3;
   bytes key = 4;
   bytes data = 5;
@@ -40,7 +40,7 @@ message UpdateReply {
 }
 
 message Commit {
-  bytes txId = 1;
+  string txId = 1;
   map<uint32, uint32> ballots = 2;
 }
 

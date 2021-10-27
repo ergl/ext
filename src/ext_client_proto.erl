@@ -30,7 +30,7 @@
 
 -type 'client.Read'() ::
       #{prevLeader              => iodata(),        % = 1, optional
-        txId                    => iodata(),        % = 2, optional
+        txId                    => unicode:chardata(), % = 2, optional
         timestamp               => non_neg_integer(), % = 3, optional, 64 bits
         key                     => iodata()         % = 4, optional
        }.
@@ -44,7 +44,7 @@
 
 -type 'client.Update'() ::
       #{prevLeader              => iodata(),        % = 1, optional
-        txId                    => iodata(),        % = 2, optional
+        txId                    => unicode:chardata(), % = 2, optional
         timestamp               => non_neg_integer(), % = 3, optional, 64 bits
         key                     => iodata(),        % = 4, optional
         data                    => iodata()         % = 5, optional
@@ -57,7 +57,7 @@
        }.
 
 -type 'client.Commit'() ::
-      #{txId                    => iodata(),        % = 1, optional
+      #{txId                    => unicode:chardata(), % = 1, optional
         ballots                 => #{non_neg_integer() => non_neg_integer()} % = 2
        }.
 
@@ -156,9 +156,9 @@ encode_msg(Msg, MsgName, Opts) ->
              #{txId := F2} ->
                  begin
                      TrF2 = id(F2, TrUserData),
-                     case iolist_size(TrF2) of
-                         0 -> B1;
-                         _ -> e_type_bytes(TrF2, <<B1/binary, 18>>, TrUserData)
+                     case is_empty_string(TrF2) of
+                         true -> B1;
+                         false -> e_type_string(TrF2, <<B1/binary, 18>>, TrUserData)
                      end
                  end;
              _ -> B1
@@ -244,9 +244,9 @@ encode_msg(Msg, MsgName, Opts) ->
              #{txId := F2} ->
                  begin
                      TrF2 = id(F2, TrUserData),
-                     case iolist_size(TrF2) of
-                         0 -> B1;
-                         _ -> e_type_bytes(TrF2, <<B1/binary, 18>>, TrUserData)
+                     case is_empty_string(TrF2) of
+                         true -> B1;
+                         false -> e_type_string(TrF2, <<B1/binary, 18>>, TrUserData)
                      end
                  end;
              _ -> B1
@@ -328,9 +328,9 @@ encode_msg(Msg, MsgName, Opts) ->
              #{txId := F1} ->
                  begin
                      TrF1 = id(F1, TrUserData),
-                     case iolist_size(TrF1) of
-                         0 -> Bin;
-                         _ -> e_type_bytes(TrF1, <<Bin/binary, 10>>, TrUserData)
+                     case is_empty_string(TrF1) of
+                         true -> Bin;
+                         false -> e_type_string(TrF1, <<Bin/binary, 10>>, TrUserData)
                      end
                  end;
              _ -> Bin
@@ -554,6 +554,22 @@ e_varint(N, Bin) when N =< 127 -> <<Bin/binary, N>>;
 e_varint(N, Bin) ->
     Bin2 = <<Bin/binary, (N band 127 bor 128)>>,
     e_varint(N bsr 7, Bin2).
+
+is_empty_string("") -> true;
+is_empty_string(<<>>) -> true;
+is_empty_string(L) when is_list(L) -> not string_has_chars(L);
+is_empty_string(B) when is_binary(B) -> false.
+
+string_has_chars([C | _]) when is_integer(C) -> true;
+string_has_chars([H | T]) ->
+    case string_has_chars(H) of
+        true -> true;
+        false -> string_has_chars(T)
+    end;
+string_has_chars(B) when is_binary(B), byte_size(B) =/= 0 -> true;
+string_has_chars(C) when is_integer(C) -> true;
+string_has_chars(<<>>) -> false;
+string_has_chars([]) -> false.
 
 
 decode_msg(Bin, MsgName) when is_binary(Bin) -> decode_msg(Bin, MsgName, []).
@@ -1664,7 +1680,7 @@ verify_msg(Msg, MsgName, Opts) ->
         _ -> ok
     end,
     case M of
-        #{txId := F2} -> v_type_bytes(F2, [txId | Path], TrUserData);
+        #{txId := F2} -> v_type_string(F2, [txId | Path], TrUserData);
         _ -> ok
     end,
     case M of
@@ -1724,7 +1740,7 @@ verify_msg(Msg, MsgName, Opts) ->
         _ -> ok
     end,
     case M of
-        #{txId := F2} -> v_type_bytes(F2, [txId | Path], TrUserData);
+        #{txId := F2} -> v_type_string(F2, [txId | Path], TrUserData);
         _ -> ok
     end,
     case M of
@@ -1780,7 +1796,7 @@ verify_msg(Msg, MsgName, Opts) ->
 -dialyzer({nowarn_function,'v_msg_client.Commit'/3}).
 'v_msg_client.Commit'(#{} = M, Path, TrUserData) ->
     case M of
-        #{txId := F1} -> v_type_bytes(F1, [txId | Path], TrUserData);
+        #{txId := F1} -> v_type_string(F1, [txId | Path], TrUserData);
         _ -> ok
     end,
     case M of
@@ -1878,6 +1894,17 @@ v_type_bool(true, _Path, _TrUserData) -> ok;
 v_type_bool(0, _Path, _TrUserData) -> ok;
 v_type_bool(1, _Path, _TrUserData) -> ok;
 v_type_bool(X, Path, _TrUserData) -> mk_type_error(bad_boolean_value, X, Path).
+
+-compile({nowarn_unused_function,v_type_string/3}).
+-dialyzer({nowarn_function,v_type_string/3}).
+v_type_string(S, Path, _TrUserData) when is_list(S); is_binary(S) ->
+    try unicode:characters_to_binary(S) of
+        B when is_binary(B) -> ok;
+        {error, _, _} -> mk_type_error(bad_unicode_string, S, Path)
+    catch
+        error:badarg -> mk_type_error(bad_unicode_string, S, Path)
+    end;
+v_type_string(X, Path, _TrUserData) -> mk_type_error(bad_unicode_string, X, Path).
 
 -compile({nowarn_unused_function,v_type_bytes/3}).
 -dialyzer({nowarn_function,v_type_bytes/3}).
