@@ -6,7 +6,8 @@
          stop/0]).
 
 %% Creation API
--export([new/5]).
+-export([default/4,
+         new/5]).
 
 %% Start API
 %% TODO(borja): Add more for read-only, snapshot transactions
@@ -74,6 +75,42 @@ stop() ->
 %%====================================================================
 %% Client Creation
 %%====================================================================
+
+-spec default(CoordId :: non_neg_integer(),
+              ReplicaId :: replica_id(),
+              MasterIp :: node_ip(),
+              MasterPort :: inet:port_number()) -> {ok, t()} | {error, term()}.
+
+default(CoordId, ReplicaID, MasterIp, MasterPort) ->
+    ext:start(),
+    case ext_ring:replica_info(ReplicaID, MasterIp, MasterPort) of
+        {error, Reason} ->
+            {error, Reason};
+        {ok, LocalIP, Ring, LocalNodes} ->
+            Pools = lists:foldl(
+                fun({_, IP, Port}, Acc) ->
+                    Name = list_to_atom(IP ++ "_" ++ integer_to_list(Port) ++ "_shackle_pool"),
+                    ok = shackle_pool:start(
+                        Name,
+                        ext_shackle_transport,
+                        [
+                            {address, IP}, {port, Port}, {reconnect, false},
+                            {socket_options, [{packet, 4}, binary, {nodelay, true}]},
+                            {init_options, #{}}
+                        ],
+                        [
+                            {pool_size, erlang:system_info(schedulers_online)},
+                            {backlog_size, infinity},
+                            {max_retries, infinity}
+                        ]
+                    ),
+                    Acc#{{IP, Port} => Name}
+                end,
+                #{},
+                LocalNodes
+            ),
+            new(ReplicaID, LocalIP, CoordId, Ring, Pools)
+    end.
 
 -spec new(ReplicaId :: replica_id(),
           LocalIP :: node_ip(),
