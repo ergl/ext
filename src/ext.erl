@@ -214,7 +214,10 @@ set_tx_init_node(Tx, _) -> Tx.
 make_id(ReplicaId, Ip, LocalId, Id) ->
     <<
         ReplicaId/binary,
+        "-",
         Ip/binary,
+        "-",
         (integer_to_binary(LocalId))/binary,
+        "-",
         (integer_to_binary(Id))/binary
     >>.
