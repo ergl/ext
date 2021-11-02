@@ -33,19 +33,16 @@
 
     %% Routing info
     ring :: ext_ring:ext_ring(),
-    %% Replica ID of the connected cluster
-    replica_id :: replica_id(),
 
     %% Opened pool of connections, one pool per node in the cluster
     conn_pool :: #{{node_ip(), inet:port_number()} => shackle_pool()},
 
-    coordinator_id :: non_neg_integer()
+    tx_id_prefix :: binary()
 }).
 
 -record(transaction, {
     id :: binary(),
     timestamp :: timestamp(),
-    threshold_timestamp :: timestamp(),
     init_node = undefined :: undefined | {node_ip(), inet:port_number()},
     leaders = #{} :: #{partition_id() => replica_id()},
     ballots = #{} :: #{partition_id() => ballot()}
@@ -119,22 +116,20 @@ default(CoordId, ReplicaID, MasterIp, MasterPort) ->
           NodePool :: #{{node_ip(), inet:port_number()} => shackle_pool()}) -> {ok, t()}.
 
 new(ReplicaId, LocalIP, WorkerId, RingInfo, NodePool) ->
-    {ok, #coordinator{self_ip=list_to_binary(inet:ntoa(LocalIP)),
+    SelfIP = list_to_binary(inet:ntoa(LocalIP)),
+    {ok, #coordinator{self_ip=SelfIP,
                       ring=RingInfo,
-                      replica_id=ReplicaId,
                       conn_pool=NodePool,
-                      coordinator_id=WorkerId}}.
+                      tx_id_prefix=make_id_prefix(ReplicaId, SelfIP, WorkerId)}}.
 
 %%====================================================================
 %% Client API functions
 %%====================================================================
 
 -spec start_transaction(t(), non_neg_integer()) -> {ok, tx()}.
-start_transaction(#coordinator{self_ip=Ip, coordinator_id=LocalId, replica_id=ReplicaId}, Id) ->
-    TxId = make_id(ReplicaId, Ip, LocalId, Id),
-    Ts0 = erlang:system_time(nanosecond),
-    %% FIXME(borja, time): Clock skew?
-    {ok, #transaction{id=TxId, timestamp=Ts0, threshold_timestamp=Ts0}}.
+start_transaction(#coordinator{tx_id_prefix=Prefix}, Id) ->
+    {ok, #transaction{id=make_id_from_prefix(Prefix, Id),
+                      timestamp=erlang:system_time(nanosecond)}}.
 
 -spec commit(t(), tx()) -> ok | error.
 commit(_, #transaction{init_node=undefined}) ->
@@ -210,14 +205,17 @@ set_tx_init_node(Tx, _) -> Tx.
 %% Util functions
 %%====================================================================
 
--spec make_id(binary(), binary(), non_neg_integer(), non_neg_integer()) -> binary().
-make_id(ReplicaId, Ip, LocalId, Id) ->
+-spec make_id_prefix(binary(), binary(), non_neg_integer()) -> binary().
+make_id_prefix(ReplicaId, Ip, CoordId) ->
     <<
         ReplicaId/binary,
         "-",
         Ip/binary,
         "-",
-        (integer_to_binary(LocalId))/binary,
-        "-",
-        (integer_to_binary(Id))/binary
+        (integer_to_binary(CoordId))/binary,
+        "-"
     >>.
+
+-spec make_id_from_prefix(binary(), non_neg_integer()) -> binary().
+make_id_from_prefix(Prefix, Id) ->
+    <<Prefix/binary, (integer_to_binary(Id))/binary>>.
