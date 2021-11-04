@@ -48,13 +48,18 @@ message CommitReply {
   bool commit = 1;
 }
 
+message Release {
+  string txId = 1;
+}
+
 message Request {
   uint32 seq = 1;
   oneof payload {
     Read read = 2;
     Update update = 3;
     Commit commit = 4;
-    Load load = 5;
+    Release release = 5;
+    Load load = 6;
   }
 }
 

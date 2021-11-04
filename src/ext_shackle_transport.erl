@@ -4,7 +4,8 @@
 
 -export([read_request/5,
          update_request/6,
-         commit/3]).
+         commit/3,
+         release/2]).
 
 %% API
 -export([init/1,
@@ -47,6 +48,10 @@ update_request(Pool, PrevLeader, TxId, Timestamp, Key, Value) ->
 commit(Pool, TxId, Ballots) ->
     shackle:call(Pool, {commit, TxId, Ballots}, infinity).
 
+-spec release(shackle_pool(), binary()) -> ok.
+release(Pool, TxId) ->
+    shackle:call(Pool, {release, TxId}, infinity).
+
 %%%===================================================================
 %%% shackle callbacks
 %%%===================================================================
@@ -71,6 +76,11 @@ handle_request({update, PrevLeader, TxId, Timestamp, Key, Value}, S=#state{req_c
 handle_request({commit, TxId, Ballots}, S=#state{req_counter=Req}) ->
     Msg = #{txId => TxId, ballots => Ballots},
     {ok, Req, make_request(Req, {commit, Msg}), incr_req(S)};
+
+handle_request({release, TxId}, S=#state{req_counter=Req}) ->
+    Msg = #{txId => TxId},
+    %% Req = undefined means shackle won't wait for a reply
+    {ok, undefined, make_request(Req, {release, Msg}), incr_req(S)};
 
 handle_request(_Request, _State) ->
     erlang:error(unknown_request).

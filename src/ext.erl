@@ -23,8 +23,9 @@
          async_update/4,
          await_update/3]).
 
-%% Commit API
--export([commit/2]).
+%% Commit / Release API
+-export([commit/2,
+         release/2]).
 
 -record(coordinator, {
     %% The IP we're using to talk to the server
@@ -45,7 +46,8 @@
     timestamp :: timestamp(),
     init_node = undefined :: undefined | {node_ip(), inet:port_number()},
     leaders = #{} :: #{partition_id() => replica_id()},
-    ballots = #{} :: #{partition_id() => ballot()}
+    ballots = #{} :: #{partition_id() => ballot()},
+    contacted_nodes = #{} :: #{{node_ip(), inet:port_number()} => []}
 }).
 
 -opaque t() :: #coordinator{}.
@@ -139,6 +141,18 @@ commit(#coordinator{conn_pool=Pools}, #transaction{id=TxId, init_node=Idx, ballo
     Pool = maps:get(Idx, Pools),
     ext_shackle_transport:commit(Pool, TxId, Ballots).
 
+-spec release(t(), tx()) -> ok.
+release(_, #transaction{init_node=undefined}) ->
+    %% If the transaction never read anything, return
+    ok;
+release(#coordinator{conn_pool=Pools}, #transaction{id=TxId, contacted_nodes=Nodes}) ->
+    ok = maps:foreach(
+        fun(Idx, _) ->
+            ok = ext_shackle_transport:release(maps:get(Idx, Pools), TxId)
+        end,
+        Nodes
+    ).
+
 -spec async_read(t(), tx(), binary()) -> {ok, read_req_id()}.
 async_read(#coordinator{ring=Ring, conn_pool=Pools},
            #transaction{timestamp=Ts, id=TxId, leaders=Leaders},
@@ -148,17 +162,18 @@ async_read(#coordinator{ring=Ring, conn_pool=Pools},
     {ok, ReqId} = ext_shackle_transport:read_request(Pool, maps:get(P, Leaders, empty), TxId, Ts, Key),
     {ok, {read, ReqId, P, Idx}}.
 
--spec await_read(t(), tx(), read_req_id()) -> {ok, binary(), tx()} | error.
-await_read(_, Tx=#transaction{ballots=Ballots}, {read, ReqId, P, Idx}) ->
+-spec await_read(t(), tx(), read_req_id()) -> {ok, binary(), tx()} | {error, tx()}.
+await_read(_, Tx=#transaction{ballots=Ballots, leaders=Leaders, contacted_nodes=Nodes}, {read, ReqId, P, Idx}) ->
     case shackle:receive_response(ReqId) of
         error ->
-            error;
+            {error, Tx#transaction{contacted_nodes=Nodes#{Idx => []}}};
+
         {ok, Ballot, ShardLeader, Value} ->
-            {
-                ok,
-                Value,
-                set_tx_init_node(Tx#transaction{ballots=Ballots#{P => Ballot}, leaders=#{P => ShardLeader}}, Idx)
-            }
+            Tx1 = Tx#transaction{ballots=Ballots#{P => Ballot},
+                                 leaders=Leaders#{P => ShardLeader},
+                                 contacted_nodes=Nodes#{Idx => []}},
+
+            {ok, Value, set_tx_init_node(Tx1, Idx)}
     end.
 
 -spec async_update(t(), tx(), binary(), binary()) -> {ok, update_req_id()}.
@@ -171,24 +186,26 @@ async_update(#coordinator{ring=Ring, conn_pool=Pools},
     {ok, ReqId} = ext_shackle_transport:update_request(Pool, maps:get(P, Leaders, empty), TxId, Ts, Key, Value),
     {ok, {update, ReqId, P, Idx}}.
 
--spec await_update(t(), tx(), update_req_id()) -> {ok, tx()} | error.
-await_update(_, Tx=#transaction{ballots=Ballots}, {update, ReqId, P, Idx}) ->
+-spec await_update(t(), tx(), update_req_id()) -> {ok, tx()} | {error, tx()}.
+await_update(_, Tx=#transaction{ballots=Ballots, leaders=Leaders, contacted_nodes=Nodes}, {update, ReqId, P, Idx}) ->
     case shackle:receive_response(ReqId) of
         error ->
-            error;
+            {error, Tx#transaction{contacted_nodes=Nodes#{Idx => []}}};
+
         {ok, Ballot, ShardLeader} ->
-            {
-                ok,
-                set_tx_init_node(Tx#transaction{ballots=Ballots#{P => Ballot}, leaders=#{P => ShardLeader}}, Idx)
-            }
+            Tx1 = Tx#transaction{ballots=Ballots#{P => Ballot},
+                                 leaders=Leaders#{P => ShardLeader},
+                                 contacted_nodes=Nodes#{Idx => []}},
+
+            {ok, set_tx_init_node(Tx1, Idx)}
     end.
 
--spec sync_read(t(), tx(), binary()) -> {ok, binary(), tx()} | error.
+-spec sync_read(t(), tx(), binary()) -> {ok, binary(), tx()} | {error, tx()}.
 sync_read(Coord, Tx, Key) ->
     {ok, Req} = async_read(Coord, Tx, Key),
     await_read(Coord, Tx, Req).
 
--spec sync_update(t(), tx(), binary(), binary()) -> {ok, tx()} | error.
+-spec sync_update(t(), tx(), binary(), binary()) -> {ok, tx()} | {error, tx()}.
 sync_update(Coord, Tx, Key, Value) ->
     {ok, Req} = async_update(Coord, Tx, Key, Value),
     await_update(Coord, Tx, Req).
