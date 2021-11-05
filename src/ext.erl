@@ -36,7 +36,7 @@
     ring :: ext_ring:ext_ring(),
 
     %% Opened pool of connections, one pool per node in the cluster
-    conn_pool :: #{{node_ip(), inet:port_number()} => shackle_pool()},
+    conn_pool :: #{node_and_port() => shackle_pool()},
 
     tx_id_prefix :: binary()
 }).
@@ -44,17 +44,17 @@
 -record(transaction, {
     id :: binary(),
     timestamp :: timestamp(),
-    init_node = undefined :: undefined | {node_ip(), inet:port_number()},
-    leaders = #{} :: #{partition_id() => replica_id()},
+    init_node = undefined :: undefined | node_and_port(),
+
     ballots = #{} :: #{partition_id() => ballot()},
-    contacted_nodes = #{} :: #{{node_ip(), inet:port_number()} => []}
+    leaders = #{} :: #{index_node() => replica_id()}
 }).
 
 -opaque t() :: #coordinator{}.
 -opaque tx() :: #transaction{}.
 
--opaque read_req_id() :: {read, shackle:external_request_id(), partition_id(), {node_ip(), inet:port_number()}}.
--opaque update_req_id() :: {update, shackle:external_request_id(), partition_id(), {node_ip(), inet:port_number()}}.
+-opaque read_req_id() :: {read, shackle:external_request_id(), index_node()}.
+-opaque update_req_id() :: {update, shackle:external_request_id(), index_node()}.
 
 -export_type([t/0, tx/0, read_req_id/0, update_req_id/0]).
 
@@ -115,7 +115,7 @@ default(CoordId, ReplicaID, MasterIp, MasterPort) ->
           LocalIP :: node_ip(),
           WorkerId :: non_neg_integer(),
           RingInfo :: ext_ring:t(),
-          NodePool :: #{{node_ip(), inet:port_number()} => shackle_pool()}) -> {ok, t()}.
+          NodePool :: #{node_and_port() => shackle_pool()}) -> {ok, t()}.
 
 new(ReplicaId, LocalIP, WorkerId, RingInfo, NodePool) ->
     SelfIP = list_to_binary(inet:ntoa(LocalIP)),
@@ -145,35 +145,35 @@ commit(#coordinator{conn_pool=Pools}, #transaction{id=TxId, init_node=Idx, ballo
 release(_, #transaction{init_node=undefined}) ->
     %% If the transaction never read anything, return
     ok;
-release(#coordinator{conn_pool=Pools}, #transaction{id=TxId, contacted_nodes=Nodes}) ->
+release(#coordinator{conn_pool=Pools}, #transaction{id=TxId, leaders=Leaders}) ->
     ok = maps:foreach(
-        fun(Idx, _) ->
-            ok = ext_shackle_transport:release(maps:get(Idx, Pools), TxId)
+        fun({_, Node}, _Leader) ->
+            %% TODO(borja): Send leader along with message, so they can be forwarded to the correct leader
+            ok = ext_shackle_transport:release(maps:get(Node, Pools), TxId)
         end,
-        Nodes
+        Leaders
     ).
 
 -spec async_read(t(), tx(), binary()) -> {ok, read_req_id()}.
 async_read(#coordinator{ring=Ring, conn_pool=Pools},
            #transaction{timestamp=Ts, id=TxId, leaders=Leaders},
            Key) ->
-    {P, Idx} = ext_ring:get_key_location(Ring, Key),
-    Pool = maps:get(Idx, Pools),
-    {ok, ReqId} = ext_shackle_transport:read_request(Pool, maps:get(P, Leaders, empty), TxId, Ts, Key),
-    {ok, {read, ReqId, P, Idx}}.
+    Idx={_, Node} = ext_ring:get_key_location(Ring, Key),
+    Pool = maps:get(Node, Pools),
+    {ok, ReqId} = ext_shackle_transport:read_request(Pool, maps:get(Idx, Leaders, empty), TxId, Ts, Key),
+    {ok, {read, ReqId, Idx}}.
 
--spec await_read(t(), tx(), read_req_id()) -> {ok, binary(), tx()} | {error, tx()}.
-await_read(_, Tx=#transaction{ballots=Ballots, leaders=Leaders, contacted_nodes=Nodes}, {read, ReqId, P, Idx}) ->
+-spec await_read(t(), tx(), read_req_id()) -> {ok, binary(), tx()} | error.
+await_read(_, Tx=#transaction{ballots=Ballots, leaders=Leaders}, {read, ReqId, Idx={P, Node}}) ->
     case shackle:receive_response(ReqId) of
         error ->
-            {error, Tx#transaction{contacted_nodes=Nodes#{Idx => []}}};
+            error;
 
         {ok, Ballot, ShardLeader, Value} ->
             Tx1 = Tx#transaction{ballots=Ballots#{P => Ballot},
-                                 leaders=Leaders#{P => ShardLeader},
-                                 contacted_nodes=Nodes#{Idx => []}},
+                                 leaders=Leaders#{Idx => ShardLeader}},
 
-            {ok, Value, set_tx_init_node(Tx1, Idx)}
+            {ok, Value, set_tx_init_node(Tx1, Node)}
     end.
 
 -spec async_update(t(), tx(), binary(), binary()) -> {ok, update_req_id()}.
@@ -181,31 +181,30 @@ async_update(#coordinator{ring=Ring, conn_pool=Pools},
              #transaction{timestamp=Ts, id=TxId, leaders=Leaders},
              Key,
              Value) ->
-    {P, Idx} = ext_ring:get_key_location(Ring, Key),
-    Pool = maps:get(Idx, Pools),
-    {ok, ReqId} = ext_shackle_transport:update_request(Pool, maps:get(P, Leaders, empty), TxId, Ts, Key, Value),
-    {ok, {update, ReqId, P, Idx}}.
+    Idx={_, Node} = ext_ring:get_key_location(Ring, Key),
+    Pool = maps:get(Node, Pools),
+    {ok, ReqId} = ext_shackle_transport:update_request(Pool, maps:get(Idx, Leaders, empty), TxId, Ts, Key, Value),
+    {ok, {update, ReqId, Idx}}.
 
--spec await_update(t(), tx(), update_req_id()) -> {ok, tx()} | {error, tx()}.
-await_update(_, Tx=#transaction{ballots=Ballots, leaders=Leaders, contacted_nodes=Nodes}, {update, ReqId, P, Idx}) ->
+-spec await_update(t(), tx(), update_req_id()) -> {ok, tx()} | error.
+await_update(_, Tx=#transaction{ballots=Ballots, leaders=Leaders}, {update, ReqId, Idx={P, Node}}) ->
     case shackle:receive_response(ReqId) of
         error ->
-            {error, Tx#transaction{contacted_nodes=Nodes#{Idx => []}}};
+            error;
 
         {ok, Ballot, ShardLeader} ->
             Tx1 = Tx#transaction{ballots=Ballots#{P => Ballot},
-                                 leaders=Leaders#{P => ShardLeader},
-                                 contacted_nodes=Nodes#{Idx => []}},
+                                 leaders=Leaders#{Idx => ShardLeader}},
 
-            {ok, set_tx_init_node(Tx1, Idx)}
+            {ok, set_tx_init_node(Tx1, Node)}
     end.
 
--spec sync_read(t(), tx(), binary()) -> {ok, binary(), tx()} | {error, tx()}.
+-spec sync_read(t(), tx(), binary()) -> {ok, binary(), tx()} | error.
 sync_read(Coord, Tx, Key) ->
     {ok, Req} = async_read(Coord, Tx, Key),
     await_read(Coord, Tx, Req).
 
--spec sync_update(t(), tx(), binary(), binary()) -> {ok, tx()} | {error, tx()}.
+-spec sync_update(t(), tx(), binary(), binary()) -> {ok, tx()} | error.
 sync_update(Coord, Tx, Key, Value) ->
     {ok, Req} = async_update(Coord, Tx, Key, Value),
     await_update(Coord, Tx, Req).
@@ -214,8 +213,8 @@ sync_update(Coord, Tx, Key, Value) ->
 %% Internal functions
 %%====================================================================
 
--spec set_tx_init_node(tx(), {node_ip(), inet:port_number()}) -> tx().
-set_tx_init_node(Tx=#transaction{init_node=undefined}, Idx) -> Tx#transaction{init_node=Idx};
+-spec set_tx_init_node(tx(), node_and_port()) -> tx().
+set_tx_init_node(Tx=#transaction{init_node=undefined}, Node) -> Tx#transaction{init_node=Node};
 set_tx_init_node(Tx, _) -> Tx.
 
 %%====================================================================

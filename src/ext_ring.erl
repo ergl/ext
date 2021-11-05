@@ -50,11 +50,11 @@ replica_info(MyReplica, Address, Port) ->
             Reply
     end.
 
--spec random_partition(t()) -> {partition_id(), {node_ip(), inet:port_number()}}.
+-spec random_partition(t()) -> index_node().
 random_partition(#ext_ring{size=Size, fixed_ring=Layout}) ->
     erlang:element(rand:uniform(Size), Layout).
 
--spec get_key_location(t(), binary()) -> {partition_id(), {node_ip(), inet:port_number()}}.
+-spec get_key_location(t(), binary()) -> index_node().
 get_key_location(#ext_ring{size=Size, fixed_ring=Layout}, Key) ->
     Pos = convert_key(Key) rem Size + 1,
     erlang:element(Pos, Layout).
