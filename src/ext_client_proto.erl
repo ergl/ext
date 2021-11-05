@@ -29,7 +29,7 @@
        }.
 
 -type 'client.Read'() ::
-      #{prevLeader              => iodata(),        % = 1, optional
+      #{prevLeader              => unicode:chardata(), % = 1, optional
         txId                    => unicode:chardata(), % = 2, optional
         timestamp               => non_neg_integer(), % = 3, optional, 64 bits
         key                     => iodata()         % = 4, optional
@@ -37,13 +37,13 @@
 
 -type 'client.ReadReply'() ::
       #{ballot                  => non_neg_integer(), % = 1, optional, 32 bits
-        servedBy                => iodata(),        % = 2, optional
+        servedBy                => unicode:chardata(), % = 2, optional
         isError                 => boolean() | 0 | 1, % = 3, optional
         data                    => iodata()         % = 4, optional
        }.
 
 -type 'client.Update'() ::
-      #{prevLeader              => iodata(),        % = 1, optional
+      #{prevLeader              => unicode:chardata(), % = 1, optional
         txId                    => unicode:chardata(), % = 2, optional
         timestamp               => non_neg_integer(), % = 3, optional, 64 bits
         key                     => iodata(),        % = 4, optional
@@ -52,7 +52,7 @@
 
 -type 'client.UpdateReply'() ::
       #{ballot                  => non_neg_integer(), % = 1, optional, 32 bits
-        servedBy                => iodata(),        % = 2, optional
+        servedBy                => unicode:chardata(), % = 2, optional
         isError                 => boolean() | 0 | 1 % = 3, optional
        }.
 
@@ -67,7 +67,7 @@
 
 -type 'client.Release'() ::
       #{txId                    => unicode:chardata(), % = 1, optional
-        prevLeader              => iodata()         % = 2, optional
+        prevLeader              => unicode:chardata() % = 2, optional
        }.
 
 -type 'client.Request'() ::
@@ -155,7 +155,7 @@ encode_msg(Msg, MsgName, Opts) ->
 
 'encode_msg_client.Read'(#{} = M, Bin, TrUserData) ->
     B1 = case M of
-             #{prevLeader := F1} -> begin TrF1 = id(F1, TrUserData), e_type_bytes(TrF1, <<Bin/binary, 10>>, TrUserData) end;
+             #{prevLeader := F1} -> begin TrF1 = id(F1, TrUserData), e_type_string(TrF1, <<Bin/binary, 10>>, TrUserData) end;
              _ -> Bin
          end,
     B2 = case M of
@@ -209,9 +209,9 @@ encode_msg(Msg, MsgName, Opts) ->
              #{servedBy := F2} ->
                  begin
                      TrF2 = id(F2, TrUserData),
-                     case iolist_size(TrF2) of
-                         0 -> B1;
-                         _ -> e_type_bytes(TrF2, <<B1/binary, 18>>, TrUserData)
+                     case is_empty_string(TrF2) of
+                         true -> B1;
+                         false -> e_type_string(TrF2, <<B1/binary, 18>>, TrUserData)
                      end
                  end;
              _ -> B1
@@ -243,7 +243,7 @@ encode_msg(Msg, MsgName, Opts) ->
 
 'encode_msg_client.Update'(#{} = M, Bin, TrUserData) ->
     B1 = case M of
-             #{prevLeader := F1} -> begin TrF1 = id(F1, TrUserData), e_type_bytes(TrF1, <<Bin/binary, 10>>, TrUserData) end;
+             #{prevLeader := F1} -> begin TrF1 = id(F1, TrUserData), e_type_string(TrF1, <<Bin/binary, 10>>, TrUserData) end;
              _ -> Bin
          end,
     B2 = case M of
@@ -308,9 +308,9 @@ encode_msg(Msg, MsgName, Opts) ->
              #{servedBy := F2} ->
                  begin
                      TrF2 = id(F2, TrUserData),
-                     case iolist_size(TrF2) of
-                         0 -> B1;
-                         _ -> e_type_bytes(TrF2, <<B1/binary, 18>>, TrUserData)
+                     case is_empty_string(TrF2) of
+                         true -> B1;
+                         false -> e_type_string(TrF2, <<B1/binary, 18>>, TrUserData)
                      end
                  end;
              _ -> B1
@@ -384,9 +384,9 @@ encode_msg(Msg, MsgName, Opts) ->
         #{prevLeader := F2} ->
             begin
                 TrF2 = id(F2, TrUserData),
-                case iolist_size(TrF2) of
-                    0 -> B1;
-                    _ -> e_type_bytes(TrF2, <<B1/binary, 18>>, TrUserData)
+                case is_empty_string(TrF2) of
+                    true -> B1;
+                    false -> e_type_string(TrF2, <<B1/binary, 18>>, TrUserData)
                 end
             end;
         _ -> B1
@@ -1801,7 +1801,7 @@ verify_msg(Msg, MsgName, Opts) ->
 -dialyzer({nowarn_function,'v_msg_client.Read'/3}).
 'v_msg_client.Read'(#{} = M, Path, TrUserData) ->
     case M of
-        #{prevLeader := F1} -> v_type_bytes(F1, [prevLeader | Path], TrUserData);
+        #{prevLeader := F1} -> v_type_string(F1, [prevLeader | Path], TrUserData);
         _ -> ok
     end,
     case M of
@@ -1835,7 +1835,7 @@ verify_msg(Msg, MsgName, Opts) ->
         _ -> ok
     end,
     case M of
-        #{servedBy := F2} -> v_type_bytes(F2, [servedBy | Path], TrUserData);
+        #{servedBy := F2} -> v_type_string(F2, [servedBy | Path], TrUserData);
         _ -> ok
     end,
     case M of
@@ -1861,7 +1861,7 @@ verify_msg(Msg, MsgName, Opts) ->
 -dialyzer({nowarn_function,'v_msg_client.Update'/3}).
 'v_msg_client.Update'(#{} = M, Path, TrUserData) ->
     case M of
-        #{prevLeader := F1} -> v_type_bytes(F1, [prevLeader | Path], TrUserData);
+        #{prevLeader := F1} -> v_type_string(F1, [prevLeader | Path], TrUserData);
         _ -> ok
     end,
     case M of
@@ -1900,7 +1900,7 @@ verify_msg(Msg, MsgName, Opts) ->
         _ -> ok
     end,
     case M of
-        #{servedBy := F2} -> v_type_bytes(F2, [servedBy | Path], TrUserData);
+        #{servedBy := F2} -> v_type_string(F2, [servedBy | Path], TrUserData);
         _ -> ok
     end,
     case M of
@@ -1960,7 +1960,7 @@ verify_msg(Msg, MsgName, Opts) ->
         _ -> ok
     end,
     case M of
-        #{prevLeader := F2} -> v_type_bytes(F2, [prevLeader | Path], TrUserData);
+        #{prevLeader := F2} -> v_type_string(F2, [prevLeader | Path], TrUserData);
         _ -> ok
     end,
     lists:foreach(fun (txId) -> ok;

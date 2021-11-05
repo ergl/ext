@@ -11,7 +11,7 @@ message LoadReply {}
 
 message Read {
   // If empty, this is the first request at the partition
-  optional bytes prevLeader = 1;
+  optional string prevLeader = 1;
   string txId = 2;
   uint64 timestamp = 3;
   bytes key = 4;
@@ -19,14 +19,14 @@ message Read {
 
 message ReadReply {
   uint32 ballot = 1;
-  bytes servedBy = 2;
+  string servedBy = 2;
   bool isError = 3;
   bytes data = 4;
 }
 
 message Update {
   // If empty, this is the first request at the partition
-  optional bytes prevLeader = 1;
+  optional string prevLeader = 1;
   string txId = 2;
   uint64 timestamp = 3;
   bytes key = 4;
@@ -35,7 +35,7 @@ message Update {
 
 message UpdateReply {
   uint32 ballot = 1;
-  bytes servedBy = 2;
+  string servedBy = 2;
   bool isError = 3;
 }
 
@@ -50,7 +50,7 @@ message CommitReply {
 
 message Release {
   string txId = 1;
-  bytes prevLeader = 2;
+  string prevLeader = 2;
 }
 
 message Request {
