@@ -50,6 +50,7 @@ message CommitReply {
 
 message Release {
   string txId = 1;
+  bytes prevLeader = 2;
 }
 
 message Request {

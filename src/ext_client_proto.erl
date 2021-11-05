@@ -66,7 +66,8 @@
        }.
 
 -type 'client.Release'() ::
-      #{txId                    => unicode:chardata() % = 1, optional
+      #{txId                    => unicode:chardata(), % = 1, optional
+        prevLeader              => iodata()         % = 2, optional
        }.
 
 -type 'client.Request'() ::
@@ -368,16 +369,27 @@ encode_msg(Msg, MsgName, Opts) ->
 
 
 'encode_msg_client.Release'(#{} = M, Bin, TrUserData) ->
+    B1 = case M of
+             #{txId := F1} ->
+                 begin
+                     TrF1 = id(F1, TrUserData),
+                     case is_empty_string(TrF1) of
+                         true -> Bin;
+                         false -> e_type_string(TrF1, <<Bin/binary, 10>>, TrUserData)
+                     end
+                 end;
+             _ -> Bin
+         end,
     case M of
-        #{txId := F1} ->
+        #{prevLeader := F2} ->
             begin
-                TrF1 = id(F1, TrUserData),
-                case is_empty_string(TrF1) of
-                    true -> Bin;
-                    false -> e_type_string(TrF1, <<Bin/binary, 10>>, TrUserData)
+                TrF2 = id(F2, TrUserData),
+                case iolist_size(TrF2) of
+                    0 -> B1;
+                    _ -> e_type_bytes(TrF2, <<B1/binary, 18>>, TrUserData)
                 end
             end;
-        _ -> Bin
+        _ -> B1
     end.
 
 'encode_msg_client.Request'(Msg, TrUserData) -> 'encode_msg_client.Request'(Msg, <<>>, TrUserData).
@@ -1103,49 +1115,56 @@ decode_msg_2_doit('client.Response', Bin, TrUserData) -> id('decode_msg_client.R
 
 'skip_64_client.CommitReply'(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> 'dfp_read_field_def_client.CommitReply'(Rest, Z1, Z2, F, F@_1, TrUserData).
 
-'decode_msg_client.Release'(Bin, TrUserData) -> 'dfp_read_field_def_client.Release'(Bin, 0, 0, 0, id(<<>>, TrUserData), TrUserData).
+'decode_msg_client.Release'(Bin, TrUserData) -> 'dfp_read_field_def_client.Release'(Bin, 0, 0, 0, id(<<>>, TrUserData), id(<<>>, TrUserData), TrUserData).
 
-'dfp_read_field_def_client.Release'(<<10, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> 'd_field_client.Release_txId'(Rest, Z1, Z2, F, F@_1, TrUserData);
-'dfp_read_field_def_client.Release'(<<>>, 0, 0, _, F@_1, _) -> #{txId => F@_1};
-'dfp_read_field_def_client.Release'(Other, Z1, Z2, F, F@_1, TrUserData) -> 'dg_read_field_def_client.Release'(Other, Z1, Z2, F, F@_1, TrUserData).
+'dfp_read_field_def_client.Release'(<<10, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.Release_txId'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+'dfp_read_field_def_client.Release'(<<18, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.Release_prevLeader'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+'dfp_read_field_def_client.Release'(<<>>, 0, 0, _, F@_1, F@_2, _) -> #{txId => F@_1, prevLeader => F@_2};
+'dfp_read_field_def_client.Release'(Other, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dg_read_field_def_client.Release'(Other, Z1, Z2, F, F@_1, F@_2, TrUserData).
 
-'dg_read_field_def_client.Release'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, TrUserData) when N < 32 - 7 -> 'dg_read_field_def_client.Release'(Rest, N + 7, X bsl N + Acc, F, F@_1, TrUserData);
-'dg_read_field_def_client.Release'(<<0:1, X:7, Rest/binary>>, N, Acc, _, F@_1, TrUserData) ->
+'dg_read_field_def_client.Release'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 32 - 7 -> 'dg_read_field_def_client.Release'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'dg_read_field_def_client.Release'(<<0:1, X:7, Rest/binary>>, N, Acc, _, F@_1, F@_2, TrUserData) ->
     Key = X bsl N + Acc,
     case Key of
-        10 -> 'd_field_client.Release_txId'(Rest, 0, 0, 0, F@_1, TrUserData);
+        10 -> 'd_field_client.Release_txId'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
+        18 -> 'd_field_client.Release_prevLeader'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
         _ ->
             case Key band 7 of
-                0 -> 'skip_varint_client.Release'(Rest, 0, 0, Key bsr 3, F@_1, TrUserData);
-                1 -> 'skip_64_client.Release'(Rest, 0, 0, Key bsr 3, F@_1, TrUserData);
-                2 -> 'skip_length_delimited_client.Release'(Rest, 0, 0, Key bsr 3, F@_1, TrUserData);
-                3 -> 'skip_group_client.Release'(Rest, 0, 0, Key bsr 3, F@_1, TrUserData);
-                5 -> 'skip_32_client.Release'(Rest, 0, 0, Key bsr 3, F@_1, TrUserData)
+                0 -> 'skip_varint_client.Release'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                1 -> 'skip_64_client.Release'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                2 -> 'skip_length_delimited_client.Release'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                3 -> 'skip_group_client.Release'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                5 -> 'skip_32_client.Release'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData)
             end
     end;
-'dg_read_field_def_client.Release'(<<>>, 0, 0, _, F@_1, _) -> #{txId => F@_1}.
+'dg_read_field_def_client.Release'(<<>>, 0, 0, _, F@_1, F@_2, _) -> #{txId => F@_1, prevLeader => F@_2}.
 
-'d_field_client.Release_txId'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, TrUserData) when N < 57 -> 'd_field_client.Release_txId'(Rest, N + 7, X bsl N + Acc, F, F@_1, TrUserData);
-'d_field_client.Release_txId'(<<0:1, X:7, Rest/binary>>, N, Acc, F, _, TrUserData) ->
+'d_field_client.Release_txId'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'd_field_client.Release_txId'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'d_field_client.Release_txId'(<<0:1, X:7, Rest/binary>>, N, Acc, F, _, F@_2, TrUserData) ->
     {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bytes:Len/binary, Rest2/binary>> = Rest, Bytes2 = binary:copy(Bytes), {id(Bytes2, TrUserData), Rest2} end,
-    'dfp_read_field_def_client.Release'(RestF, 0, 0, F, NewFValue, TrUserData).
+    'dfp_read_field_def_client.Release'(RestF, 0, 0, F, NewFValue, F@_2, TrUserData).
 
-'skip_varint_client.Release'(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> 'skip_varint_client.Release'(Rest, Z1, Z2, F, F@_1, TrUserData);
-'skip_varint_client.Release'(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> 'dfp_read_field_def_client.Release'(Rest, Z1, Z2, F, F@_1, TrUserData).
+'d_field_client.Release_prevLeader'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'd_field_client.Release_prevLeader'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'d_field_client.Release_prevLeader'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, _, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bytes:Len/binary, Rest2/binary>> = Rest, Bytes2 = binary:copy(Bytes), {id(Bytes2, TrUserData), Rest2} end,
+    'dfp_read_field_def_client.Release'(RestF, 0, 0, F, F@_1, NewFValue, TrUserData).
 
-'skip_length_delimited_client.Release'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, TrUserData) when N < 57 -> 'skip_length_delimited_client.Release'(Rest, N + 7, X bsl N + Acc, F, F@_1, TrUserData);
-'skip_length_delimited_client.Release'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, TrUserData) ->
+'skip_varint_client.Release'(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'skip_varint_client.Release'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+'skip_varint_client.Release'(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_client.Release'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+'skip_length_delimited_client.Release'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'skip_length_delimited_client.Release'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'skip_length_delimited_client.Release'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) ->
     Length = X bsl N + Acc,
     <<_:Length/binary, Rest2/binary>> = Rest,
-    'dfp_read_field_def_client.Release'(Rest2, 0, 0, F, F@_1, TrUserData).
+    'dfp_read_field_def_client.Release'(Rest2, 0, 0, F, F@_1, F@_2, TrUserData).
 
-'skip_group_client.Release'(Bin, _, Z2, FNum, F@_1, TrUserData) ->
+'skip_group_client.Release'(Bin, _, Z2, FNum, F@_1, F@_2, TrUserData) ->
     {_, Rest} = read_group(Bin, FNum),
-    'dfp_read_field_def_client.Release'(Rest, 0, Z2, FNum, F@_1, TrUserData).
+    'dfp_read_field_def_client.Release'(Rest, 0, Z2, FNum, F@_1, F@_2, TrUserData).
 
-'skip_32_client.Release'(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> 'dfp_read_field_def_client.Release'(Rest, Z1, Z2, F, F@_1, TrUserData).
+'skip_32_client.Release'(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_client.Release'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
 
-'skip_64_client.Release'(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> 'dfp_read_field_def_client.Release'(Rest, Z1, Z2, F, F@_1, TrUserData).
+'skip_64_client.Release'(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_client.Release'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
 
 'decode_msg_client.Request'(Bin, TrUserData) -> 'dfp_read_field_def_client.Request'(Bin, 0, 0, 0, id(0, TrUserData), id('$undef', TrUserData), TrUserData).
 
@@ -1676,10 +1695,15 @@ merge_msgs(Prev, New, MsgName, Opts) ->
 -compile({nowarn_unused_function,'merge_msg_client.Release'/3}).
 'merge_msg_client.Release'(PMsg, NMsg, _) ->
     S1 = #{},
+    S2 = case {PMsg, NMsg} of
+             {_, #{txId := NFtxId}} -> S1#{txId => NFtxId};
+             {#{txId := PFtxId}, _} -> S1#{txId => PFtxId};
+             _ -> S1
+         end,
     case {PMsg, NMsg} of
-        {_, #{txId := NFtxId}} -> S1#{txId => NFtxId};
-        {#{txId := PFtxId}, _} -> S1#{txId => PFtxId};
-        _ -> S1
+        {_, #{prevLeader := NFprevLeader}} -> S2#{prevLeader => NFprevLeader};
+        {#{prevLeader := PFprevLeader}, _} -> S2#{prevLeader => PFprevLeader};
+        _ -> S2
     end.
 
 -compile({nowarn_unused_function,'merge_msg_client.Request'/3}).
@@ -1935,7 +1959,12 @@ verify_msg(Msg, MsgName, Opts) ->
         #{txId := F1} -> v_type_string(F1, [txId | Path], TrUserData);
         _ -> ok
     end,
+    case M of
+        #{prevLeader := F2} -> v_type_bytes(F2, [prevLeader | Path], TrUserData);
+        _ -> ok
+    end,
     lists:foreach(fun (txId) -> ok;
+                      (prevLeader) -> ok;
                       (OtherKey) -> mk_type_error({extraneous_key, OtherKey}, M, Path)
                   end,
                   maps:keys(M)),

@@ -147,9 +147,8 @@ release(_, #transaction{init_node=undefined}) ->
     ok;
 release(#coordinator{conn_pool=Pools}, #transaction{id=TxId, leaders=Leaders}) ->
     ok = maps:foreach(
-        fun({_, Node}, _Leader) ->
-            %% TODO(borja): Send leader along with message, so they can be forwarded to the correct leader
-            ok = ext_shackle_transport:release(maps:get(Node, Pools), TxId)
+        fun({_, Node}, Leader) ->
+            ok = ext_shackle_transport:release(maps:get(Node, Pools), TxId, Leader)
         end,
         Leaders
     ).
