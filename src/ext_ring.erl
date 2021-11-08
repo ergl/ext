@@ -68,12 +68,15 @@ convert_key(Key) ->
     convert_key_binary(Key).
 
 -spec convert_key_binary(binary()) -> non_neg_integer().
+convert_key_binary(<<X:64>>) ->
+    convert_key_int(X);
+convert_key_binary(<<X:32>>) ->
+    convert_key_int(X);
 convert_key_binary(Bin) ->
-    AsInt = (catch list_to_integer(binary_to_list(Bin))),
-    if
-        is_integer(AsInt) ->
-            convert_key_int(AsInt);
-        true ->
+    case catch binary_to_integer(Bin) of
+        N when is_integer(N) ->
+            convert_key_int(N);
+        _ ->
             convert_key_hash(Bin)
     end.
 
