@@ -18,7 +18,8 @@
 %% API
 -export([replica_info/3,
          random_partition/1,
-         get_key_location/2]).
+         get_key_location/2,
+         size/1]).
 
 -spec replica_info(
     MyReplica :: replica_id(),
@@ -58,6 +59,9 @@ random_partition(#ext_ring{size=Size, fixed_ring=Layout}) ->
 get_key_location(#ext_ring{size=Size, fixed_ring=Layout}, Key) ->
     Pos = convert_key(Key) rem Size + 1,
     erlang:element(Pos, Layout).
+
+-spec size(t()) -> non_neg_integer().
+size(#ext_ring{size=Size}) -> Size.
 
 %%====================================================================
 %% Routing Internal functions
