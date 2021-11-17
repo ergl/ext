@@ -53,6 +53,20 @@ message Release {
   string prevLeader = 2;
 }
 
+message ClientPing {
+  string txId = 1;
+}
+
+message ClientPong {}
+
+message ReadPing {
+  Read payload = 1;
+}
+
+message ReadPong {
+  ReadReply payload = 1;
+}
+
 message Request {
   uint32 seq = 1;
   oneof payload {
@@ -61,6 +75,8 @@ message Request {
     Commit commit = 4;
     Release release = 5;
     Load load = 6;
+    ClientPing ping = 7;
+    ReadPing readPing = 8;
   }
 }
 
@@ -71,5 +87,7 @@ message Response {
     UpdateReply update = 3;
     CommitReply commit = 4;
     LoadReply load = 5;
+    ClientPong pong = 6;
+    ReadPong readPong = 8;
   }
 }

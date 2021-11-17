@@ -7,6 +7,9 @@
          commit/3,
          release/3]).
 
+-export([ping/2,
+         read_ping/5]).
+
 %% API
 -export([init/1,
          setup/2,
@@ -20,6 +23,12 @@
     max_req_id :: non_neg_integer()
 }).
 -type state() :: #state{}.
+
+ping(Pool, TxId) ->
+    shackle:cast(Pool, {ping, TxId}, self(), infinity).
+
+read_ping(Pool, PrevLeader, TxId, Timestamp, Key) ->
+    shackle:cast(Pool, {read_ping, PrevLeader, TxId, Timestamp, Key}, self(), infinity).
 
 -spec read_request(
     Pool :: shackle_pool(),
@@ -62,6 +71,15 @@ init(_Options) ->
 
 setup(_Socket, State) ->
     {ok, State}.
+
+handle_request({ping, TxId}, S=#state{req_counter=Req}) ->
+    Msg = #{txId => TxId},
+    {ok, Req, make_request(Req, {ping, Msg}), incr_req(S)};
+
+handle_request({read_ping, PrevLeader, TxId, Timestamp, Key}, S=#state{req_counter=Req}) ->
+    Msg0 = #{txId => TxId, timestamp => Timestamp, key => Key},
+    Msg = case PrevLeader of empty -> Msg0; _ -> Msg0#{prevLeader => PrevLeader} end,
+    {ok, Req, make_request(Req, {readPing, #{payload => Msg}}), incr_req(S)};
 
 handle_request({read, PrevLeader, TxId, Timestamp, Key}, S=#state{req_counter=Req}) ->
     Msg0 = #{txId => TxId, timestamp => Timestamp, key => Key},
@@ -116,7 +134,13 @@ decode_payload({update, Map}) ->
         _ -> error
     end;
 decode_payload({commit, #{commit := true}}) -> ok;
-decode_payload({commit, #{commit := false}}) -> error.
+decode_payload({commit, #{commit := false}}) -> error;
+decode_payload({pong, _}) -> ok;
+decode_payload({readPong, #{payload := ReadReplyMap}}) ->
+    case ReadReplyMap of
+        #{ballot := B, servedBy := L, data := D, isError := false} -> {ok, B, L, D};
+        _ -> error
+    end.
 
 -spec incr_req(state()) -> state().
 incr_req(S=#state{req_counter=ReqC, max_req_id=MaxId}) ->
