@@ -9,8 +9,7 @@
 -export([default/4,
          new/5]).
 
--export([ping/3,
-         read_ping/3]).
+-export([ping/3]).
 
 %% Start API
 %% TODO(borja): Add more for read-only, snapshot transactions
@@ -219,22 +218,6 @@ ping(#coordinator{ring=Ring, conn_pool=Pools},
     Pool = maps:get(Node, Pools),
     {ok, ReqId} = ext_shackle_transport:ping(Pool, TxId),
     shackle:receive_response(ReqId).
-
--spec read_ping(t(), tx(), binary()) -> {ok, tx()} | error.
-read_ping(#coordinator{ring=Ring, conn_pool=Pools},
-          Tx=#transaction{timestamp=Ts, id=TxId, leaders=Leaders, ballots=Ballots},
-          Key) ->
-    Idx={P, Node} = ext_ring:get_key_location(Ring, Key),
-    Pool = maps:get(Node, Pools),
-    {ok, ReqId} = ext_shackle_transport:read_ping(Pool, maps:get(Idx, Leaders, empty), TxId, Ts, Key),
-    case shackle:receive_response(ReqId) of
-        error ->
-            error;
-        {ok, Ballot, ShardLeader, Value} ->
-            Tx1 = Tx#transaction{ballots=Ballots#{P => Ballot},
-                                 leaders=Leaders#{Idx => ShardLeader}},
-            {ok, Value, set_tx_init_node(Tx1, Node)}
-    end.
 
 %%====================================================================
 %% Internal functions

@@ -78,27 +78,19 @@
       #{
        }.
 
--type 'client.ReadPing'() ::
-      #{payload                 => 'client.Read'()  % = 1, optional
-       }.
-
--type 'client.ReadPong'() ::
-      #{payload                 => 'client.ReadReply'() % = 1, optional
-       }.
-
 -type 'client.Request'() ::
       #{seq                     => non_neg_integer(), % = 1, optional, 32 bits
-        payload                 => {read, 'client.Read'()} | {update, 'client.Update'()} | {commit, 'client.Commit'()} | {release, 'client.Release'()} | {load, 'client.Load'()} | {ping, 'client.ClientPing'()} | {readPing, 'client.ReadPing'()} % oneof
+        payload                 => {read, 'client.Read'()} | {update, 'client.Update'()} | {commit, 'client.Commit'()} | {release, 'client.Release'()} | {load, 'client.Load'()} | {ping, 'client.ClientPing'()} % oneof
        }.
 
 -type 'client.Response'() ::
       #{seq                     => non_neg_integer(), % = 1, optional, 32 bits
-        payload                 => {read, 'client.ReadReply'()} | {update, 'client.UpdateReply'()} | {commit, 'client.CommitReply'()} | {load, 'client.LoadReply'()} | {pong, 'client.ClientPong'()} | {readPong, 'client.ReadPong'()} % oneof
+        payload                 => {read, 'client.ReadReply'()} | {update, 'client.UpdateReply'()} | {commit, 'client.CommitReply'()} | {load, 'client.LoadReply'()} | {pong, 'client.ClientPong'()} % oneof
        }.
 
--export_type(['client.Load'/0, 'client.LoadReply'/0, 'client.Read'/0, 'client.ReadReply'/0, 'client.Update'/0, 'client.UpdateReply'/0, 'client.Commit'/0, 'client.CommitReply'/0, 'client.Release'/0, 'client.ClientPing'/0, 'client.ClientPong'/0, 'client.ReadPing'/0, 'client.ReadPong'/0, 'client.Request'/0, 'client.Response'/0]).
--type '$msg_name'() :: 'client.Load' | 'client.LoadReply' | 'client.Read' | 'client.ReadReply' | 'client.Update' | 'client.UpdateReply' | 'client.Commit' | 'client.CommitReply' | 'client.Release' | 'client.ClientPing' | 'client.ClientPong' | 'client.ReadPing' | 'client.ReadPong' | 'client.Request' | 'client.Response'.
--type '$msg'() :: 'client.Load'() | 'client.LoadReply'() | 'client.Read'() | 'client.ReadReply'() | 'client.Update'() | 'client.UpdateReply'() | 'client.Commit'() | 'client.CommitReply'() | 'client.Release'() | 'client.ClientPing'() | 'client.ClientPong'() | 'client.ReadPing'() | 'client.ReadPong'() | 'client.Request'() | 'client.Response'().
+-export_type(['client.Load'/0, 'client.LoadReply'/0, 'client.Read'/0, 'client.ReadReply'/0, 'client.Update'/0, 'client.UpdateReply'/0, 'client.Commit'/0, 'client.CommitReply'/0, 'client.Release'/0, 'client.ClientPing'/0, 'client.ClientPong'/0, 'client.Request'/0, 'client.Response'/0]).
+-type '$msg_name'() :: 'client.Load' | 'client.LoadReply' | 'client.Read' | 'client.ReadReply' | 'client.Update' | 'client.UpdateReply' | 'client.Commit' | 'client.CommitReply' | 'client.Release' | 'client.ClientPing' | 'client.ClientPong' | 'client.Request' | 'client.Response'.
+-type '$msg'() :: 'client.Load'() | 'client.LoadReply'() | 'client.Read'() | 'client.ReadReply'() | 'client.Update'() | 'client.UpdateReply'() | 'client.Commit'() | 'client.CommitReply'() | 'client.Release'() | 'client.ClientPing'() | 'client.ClientPong'() | 'client.Request'() | 'client.Response'().
 -export_type(['$msg_name'/0, '$msg'/0]).
 
 -dialyzer({no_underspecs, encode_msg/2}).
@@ -125,8 +117,6 @@ encode_msg(Msg, MsgName, Opts) ->
         'client.Release' -> 'encode_msg_client.Release'(id(Msg, TrUserData), TrUserData);
         'client.ClientPing' -> 'encode_msg_client.ClientPing'(id(Msg, TrUserData), TrUserData);
         'client.ClientPong' -> 'encode_msg_client.ClientPong'(id(Msg, TrUserData), TrUserData);
-        'client.ReadPing' -> 'encode_msg_client.ReadPing'(id(Msg, TrUserData), TrUserData);
-        'client.ReadPong' -> 'encode_msg_client.ReadPong'(id(Msg, TrUserData), TrUserData);
         'client.Request' -> 'encode_msg_client.Request'(id(Msg, TrUserData), TrUserData);
         'client.Response' -> 'encode_msg_client.Response'(id(Msg, TrUserData), TrUserData)
     end.
@@ -430,36 +420,6 @@ encode_msg(Msg, MsgName, Opts) ->
 
 'encode_msg_client.ClientPong'(_Msg, _TrUserData) -> <<>>.
 
-'encode_msg_client.ReadPing'(Msg, TrUserData) -> 'encode_msg_client.ReadPing'(Msg, <<>>, TrUserData).
-
-
-'encode_msg_client.ReadPing'(#{} = M, Bin, TrUserData) ->
-    case M of
-        #{payload := F1} ->
-            begin
-                TrF1 = id(F1, TrUserData),
-                if TrF1 =:= undefined -> Bin;
-                   true -> 'e_mfield_client.ReadPing_payload'(TrF1, <<Bin/binary, 10>>, TrUserData)
-                end
-            end;
-        _ -> Bin
-    end.
-
-'encode_msg_client.ReadPong'(Msg, TrUserData) -> 'encode_msg_client.ReadPong'(Msg, <<>>, TrUserData).
-
-
-'encode_msg_client.ReadPong'(#{} = M, Bin, TrUserData) ->
-    case M of
-        #{payload := F1} ->
-            begin
-                TrF1 = id(F1, TrUserData),
-                if TrF1 =:= undefined -> Bin;
-                   true -> 'e_mfield_client.ReadPong_payload'(TrF1, <<Bin/binary, 10>>, TrUserData)
-                end
-            end;
-        _ -> Bin
-    end.
-
 'encode_msg_client.Request'(Msg, TrUserData) -> 'encode_msg_client.Request'(Msg, <<>>, TrUserData).
 
 
@@ -482,8 +442,7 @@ encode_msg(Msg, MsgName, Opts) ->
                 {commit, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Request_commit'(TrTF2, <<B1/binary, 34>>, TrUserData) end;
                 {release, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Request_release'(TrTF2, <<B1/binary, 42>>, TrUserData) end;
                 {load, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Request_load'(TrTF2, <<B1/binary, 50>>, TrUserData) end;
-                {ping, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Request_ping'(TrTF2, <<B1/binary, 58>>, TrUserData) end;
-                {readPing, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Request_readPing'(TrTF2, <<B1/binary, 66>>, TrUserData) end
+                {ping, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Request_ping'(TrTF2, <<B1/binary, 58>>, TrUserData) end
             end;
         _ -> B1
     end.
@@ -509,8 +468,7 @@ encode_msg(Msg, MsgName, Opts) ->
                 {update, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Response_update'(TrTF2, <<B1/binary, 26>>, TrUserData) end;
                 {commit, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Response_commit'(TrTF2, <<B1/binary, 34>>, TrUserData) end;
                 {load, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Response_load'(TrTF2, <<B1/binary, 42>>, TrUserData) end;
-                {pong, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Response_pong'(TrTF2, <<B1/binary, 50>>, TrUserData) end;
-                {readPong, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Response_readPong'(TrTF2, <<B1/binary, 66>>, TrUserData) end
+                {pong, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Response_pong'(TrTF2, <<B1/binary, 50>>, TrUserData) end
             end;
         _ -> B1
     end.
@@ -525,16 +483,6 @@ encode_msg(Msg, MsgName, Opts) ->
     Bin3 = 'e_mfield_client.Commit_ballots'('tr_encode_client.Commit.ballots[x]'(Elem, TrUserData), Bin2, TrUserData),
     'e_field_client.Commit_ballots'(Rest, Bin3, TrUserData);
 'e_field_client.Commit_ballots'([], Bin, _TrUserData) -> Bin.
-
-'e_mfield_client.ReadPing_payload'(Msg, Bin, TrUserData) ->
-    SubBin = 'encode_msg_client.Read'(Msg, <<>>, TrUserData),
-    Bin2 = e_varint(byte_size(SubBin), Bin),
-    <<Bin2/binary, SubBin/binary>>.
-
-'e_mfield_client.ReadPong_payload'(Msg, Bin, TrUserData) ->
-    SubBin = 'encode_msg_client.ReadReply'(Msg, <<>>, TrUserData),
-    Bin2 = e_varint(byte_size(SubBin), Bin),
-    <<Bin2/binary, SubBin/binary>>.
 
 'e_mfield_client.Request_read'(Msg, Bin, TrUserData) ->
     SubBin = 'encode_msg_client.Read'(Msg, <<>>, TrUserData),
@@ -566,11 +514,6 @@ encode_msg(Msg, MsgName, Opts) ->
     Bin2 = e_varint(byte_size(SubBin), Bin),
     <<Bin2/binary, SubBin/binary>>.
 
-'e_mfield_client.Request_readPing'(Msg, Bin, TrUserData) ->
-    SubBin = 'encode_msg_client.ReadPing'(Msg, <<>>, TrUserData),
-    Bin2 = e_varint(byte_size(SubBin), Bin),
-    <<Bin2/binary, SubBin/binary>>.
-
 'e_mfield_client.Response_read'(Msg, Bin, TrUserData) ->
     SubBin = 'encode_msg_client.ReadReply'(Msg, <<>>, TrUserData),
     Bin2 = e_varint(byte_size(SubBin), Bin),
@@ -589,11 +532,6 @@ encode_msg(Msg, MsgName, Opts) ->
 'e_mfield_client.Response_load'(_Msg, Bin, _TrUserData) -> <<Bin/binary, 0>>.
 
 'e_mfield_client.Response_pong'(_Msg, Bin, _TrUserData) -> <<Bin/binary, 0>>.
-
-'e_mfield_client.Response_readPong'(Msg, Bin, TrUserData) ->
-    SubBin = 'encode_msg_client.ReadPong'(Msg, <<>>, TrUserData),
-    Bin2 = e_varint(byte_size(SubBin), Bin),
-    <<Bin2/binary, SubBin/binary>>.
 
 'encode_msg_map<uint32,uint32>'(#{key := F1, value := F2}, Bin, TrUserData) ->
     B1 = begin TrF1 = id(F1, TrUserData), e_varint(TrF1, <<Bin/binary, 8>>, TrUserData) end,
@@ -748,8 +686,6 @@ decode_msg_2_doit('client.CommitReply', Bin, TrUserData) -> id('decode_msg_clien
 decode_msg_2_doit('client.Release', Bin, TrUserData) -> id('decode_msg_client.Release'(Bin, TrUserData), TrUserData);
 decode_msg_2_doit('client.ClientPing', Bin, TrUserData) -> id('decode_msg_client.ClientPing'(Bin, TrUserData), TrUserData);
 decode_msg_2_doit('client.ClientPong', Bin, TrUserData) -> id('decode_msg_client.ClientPong'(Bin, TrUserData), TrUserData);
-decode_msg_2_doit('client.ReadPing', Bin, TrUserData) -> id('decode_msg_client.ReadPing'(Bin, TrUserData), TrUserData);
-decode_msg_2_doit('client.ReadPong', Bin, TrUserData) -> id('decode_msg_client.ReadPong'(Bin, TrUserData), TrUserData);
 decode_msg_2_doit('client.Request', Bin, TrUserData) -> id('decode_msg_client.Request'(Bin, TrUserData), TrUserData);
 decode_msg_2_doit('client.Response', Bin, TrUserData) -> id('decode_msg_client.Response'(Bin, TrUserData), TrUserData).
 
@@ -1347,124 +1283,6 @@ decode_msg_2_doit('client.Response', Bin, TrUserData) -> id('decode_msg_client.R
 
 'skip_64_client.ClientPong'(<<_:64, Rest/binary>>, Z1, Z2, F, TrUserData) -> 'dfp_read_field_def_client.ClientPong'(Rest, Z1, Z2, F, TrUserData).
 
-'decode_msg_client.ReadPing'(Bin, TrUserData) -> 'dfp_read_field_def_client.ReadPing'(Bin, 0, 0, 0, id('$undef', TrUserData), TrUserData).
-
-'dfp_read_field_def_client.ReadPing'(<<10, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> 'd_field_client.ReadPing_payload'(Rest, Z1, Z2, F, F@_1, TrUserData);
-'dfp_read_field_def_client.ReadPing'(<<>>, 0, 0, _, F@_1, _) ->
-    S1 = #{},
-    if F@_1 == '$undef' -> S1;
-       true -> S1#{payload => F@_1}
-    end;
-'dfp_read_field_def_client.ReadPing'(Other, Z1, Z2, F, F@_1, TrUserData) -> 'dg_read_field_def_client.ReadPing'(Other, Z1, Z2, F, F@_1, TrUserData).
-
-'dg_read_field_def_client.ReadPing'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, TrUserData) when N < 32 - 7 -> 'dg_read_field_def_client.ReadPing'(Rest, N + 7, X bsl N + Acc, F, F@_1, TrUserData);
-'dg_read_field_def_client.ReadPing'(<<0:1, X:7, Rest/binary>>, N, Acc, _, F@_1, TrUserData) ->
-    Key = X bsl N + Acc,
-    case Key of
-        10 -> 'd_field_client.ReadPing_payload'(Rest, 0, 0, 0, F@_1, TrUserData);
-        _ ->
-            case Key band 7 of
-                0 -> 'skip_varint_client.ReadPing'(Rest, 0, 0, Key bsr 3, F@_1, TrUserData);
-                1 -> 'skip_64_client.ReadPing'(Rest, 0, 0, Key bsr 3, F@_1, TrUserData);
-                2 -> 'skip_length_delimited_client.ReadPing'(Rest, 0, 0, Key bsr 3, F@_1, TrUserData);
-                3 -> 'skip_group_client.ReadPing'(Rest, 0, 0, Key bsr 3, F@_1, TrUserData);
-                5 -> 'skip_32_client.ReadPing'(Rest, 0, 0, Key bsr 3, F@_1, TrUserData)
-            end
-    end;
-'dg_read_field_def_client.ReadPing'(<<>>, 0, 0, _, F@_1, _) ->
-    S1 = #{},
-    if F@_1 == '$undef' -> S1;
-       true -> S1#{payload => F@_1}
-    end.
-
-'d_field_client.ReadPing_payload'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, TrUserData) when N < 57 -> 'd_field_client.ReadPing_payload'(Rest, N + 7, X bsl N + Acc, F, F@_1, TrUserData);
-'d_field_client.ReadPing_payload'(<<0:1, X:7, Rest/binary>>, N, Acc, F, Prev, TrUserData) ->
-    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bs:Len/binary, Rest2/binary>> = Rest, {id('decode_msg_client.Read'(Bs, TrUserData), TrUserData), Rest2} end,
-    'dfp_read_field_def_client.ReadPing'(RestF,
-                                         0,
-                                         0,
-                                         F,
-                                         if Prev == '$undef' -> NewFValue;
-                                            true -> 'merge_msg_client.Read'(Prev, NewFValue, TrUserData)
-                                         end,
-                                         TrUserData).
-
-'skip_varint_client.ReadPing'(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> 'skip_varint_client.ReadPing'(Rest, Z1, Z2, F, F@_1, TrUserData);
-'skip_varint_client.ReadPing'(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> 'dfp_read_field_def_client.ReadPing'(Rest, Z1, Z2, F, F@_1, TrUserData).
-
-'skip_length_delimited_client.ReadPing'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, TrUserData) when N < 57 -> 'skip_length_delimited_client.ReadPing'(Rest, N + 7, X bsl N + Acc, F, F@_1, TrUserData);
-'skip_length_delimited_client.ReadPing'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, TrUserData) ->
-    Length = X bsl N + Acc,
-    <<_:Length/binary, Rest2/binary>> = Rest,
-    'dfp_read_field_def_client.ReadPing'(Rest2, 0, 0, F, F@_1, TrUserData).
-
-'skip_group_client.ReadPing'(Bin, _, Z2, FNum, F@_1, TrUserData) ->
-    {_, Rest} = read_group(Bin, FNum),
-    'dfp_read_field_def_client.ReadPing'(Rest, 0, Z2, FNum, F@_1, TrUserData).
-
-'skip_32_client.ReadPing'(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> 'dfp_read_field_def_client.ReadPing'(Rest, Z1, Z2, F, F@_1, TrUserData).
-
-'skip_64_client.ReadPing'(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> 'dfp_read_field_def_client.ReadPing'(Rest, Z1, Z2, F, F@_1, TrUserData).
-
-'decode_msg_client.ReadPong'(Bin, TrUserData) -> 'dfp_read_field_def_client.ReadPong'(Bin, 0, 0, 0, id('$undef', TrUserData), TrUserData).
-
-'dfp_read_field_def_client.ReadPong'(<<10, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> 'd_field_client.ReadPong_payload'(Rest, Z1, Z2, F, F@_1, TrUserData);
-'dfp_read_field_def_client.ReadPong'(<<>>, 0, 0, _, F@_1, _) ->
-    S1 = #{},
-    if F@_1 == '$undef' -> S1;
-       true -> S1#{payload => F@_1}
-    end;
-'dfp_read_field_def_client.ReadPong'(Other, Z1, Z2, F, F@_1, TrUserData) -> 'dg_read_field_def_client.ReadPong'(Other, Z1, Z2, F, F@_1, TrUserData).
-
-'dg_read_field_def_client.ReadPong'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, TrUserData) when N < 32 - 7 -> 'dg_read_field_def_client.ReadPong'(Rest, N + 7, X bsl N + Acc, F, F@_1, TrUserData);
-'dg_read_field_def_client.ReadPong'(<<0:1, X:7, Rest/binary>>, N, Acc, _, F@_1, TrUserData) ->
-    Key = X bsl N + Acc,
-    case Key of
-        10 -> 'd_field_client.ReadPong_payload'(Rest, 0, 0, 0, F@_1, TrUserData);
-        _ ->
-            case Key band 7 of
-                0 -> 'skip_varint_client.ReadPong'(Rest, 0, 0, Key bsr 3, F@_1, TrUserData);
-                1 -> 'skip_64_client.ReadPong'(Rest, 0, 0, Key bsr 3, F@_1, TrUserData);
-                2 -> 'skip_length_delimited_client.ReadPong'(Rest, 0, 0, Key bsr 3, F@_1, TrUserData);
-                3 -> 'skip_group_client.ReadPong'(Rest, 0, 0, Key bsr 3, F@_1, TrUserData);
-                5 -> 'skip_32_client.ReadPong'(Rest, 0, 0, Key bsr 3, F@_1, TrUserData)
-            end
-    end;
-'dg_read_field_def_client.ReadPong'(<<>>, 0, 0, _, F@_1, _) ->
-    S1 = #{},
-    if F@_1 == '$undef' -> S1;
-       true -> S1#{payload => F@_1}
-    end.
-
-'d_field_client.ReadPong_payload'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, TrUserData) when N < 57 -> 'd_field_client.ReadPong_payload'(Rest, N + 7, X bsl N + Acc, F, F@_1, TrUserData);
-'d_field_client.ReadPong_payload'(<<0:1, X:7, Rest/binary>>, N, Acc, F, Prev, TrUserData) ->
-    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bs:Len/binary, Rest2/binary>> = Rest, {id('decode_msg_client.ReadReply'(Bs, TrUserData), TrUserData), Rest2} end,
-    'dfp_read_field_def_client.ReadPong'(RestF,
-                                         0,
-                                         0,
-                                         F,
-                                         if Prev == '$undef' -> NewFValue;
-                                            true -> 'merge_msg_client.ReadReply'(Prev, NewFValue, TrUserData)
-                                         end,
-                                         TrUserData).
-
-'skip_varint_client.ReadPong'(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> 'skip_varint_client.ReadPong'(Rest, Z1, Z2, F, F@_1, TrUserData);
-'skip_varint_client.ReadPong'(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> 'dfp_read_field_def_client.ReadPong'(Rest, Z1, Z2, F, F@_1, TrUserData).
-
-'skip_length_delimited_client.ReadPong'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, TrUserData) when N < 57 -> 'skip_length_delimited_client.ReadPong'(Rest, N + 7, X bsl N + Acc, F, F@_1, TrUserData);
-'skip_length_delimited_client.ReadPong'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, TrUserData) ->
-    Length = X bsl N + Acc,
-    <<_:Length/binary, Rest2/binary>> = Rest,
-    'dfp_read_field_def_client.ReadPong'(Rest2, 0, 0, F, F@_1, TrUserData).
-
-'skip_group_client.ReadPong'(Bin, _, Z2, FNum, F@_1, TrUserData) ->
-    {_, Rest} = read_group(Bin, FNum),
-    'dfp_read_field_def_client.ReadPong'(Rest, 0, Z2, FNum, F@_1, TrUserData).
-
-'skip_32_client.ReadPong'(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> 'dfp_read_field_def_client.ReadPong'(Rest, Z1, Z2, F, F@_1, TrUserData).
-
-'skip_64_client.ReadPong'(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> 'dfp_read_field_def_client.ReadPong'(Rest, Z1, Z2, F, F@_1, TrUserData).
-
 'decode_msg_client.Request'(Bin, TrUserData) -> 'dfp_read_field_def_client.Request'(Bin, 0, 0, 0, id(0, TrUserData), id('$undef', TrUserData), TrUserData).
 
 'dfp_read_field_def_client.Request'(<<8, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.Request_seq'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
@@ -1474,7 +1292,6 @@ decode_msg_2_doit('client.Response', Bin, TrUserData) -> id('decode_msg_client.R
 'dfp_read_field_def_client.Request'(<<42, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.Request_release'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
 'dfp_read_field_def_client.Request'(<<50, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.Request_load'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
 'dfp_read_field_def_client.Request'(<<58, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.Request_ping'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
-'dfp_read_field_def_client.Request'(<<66, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.Request_readPing'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
 'dfp_read_field_def_client.Request'(<<>>, 0, 0, _, F@_1, F@_2, _) ->
     S1 = #{seq => F@_1},
     if F@_2 == '$undef' -> S1;
@@ -1493,7 +1310,6 @@ decode_msg_2_doit('client.Response', Bin, TrUserData) -> id('decode_msg_client.R
         42 -> 'd_field_client.Request_release'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
         50 -> 'd_field_client.Request_load'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
         58 -> 'd_field_client.Request_ping'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
-        66 -> 'd_field_client.Request_readPing'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
         _ ->
             case Key band 7 of
                 0 -> 'skip_varint_client.Request'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
@@ -1604,21 +1420,6 @@ decode_msg_2_doit('client.Response', Bin, TrUserData) -> id('decode_msg_client.R
                                         end,
                                         TrUserData).
 
-'d_field_client.Request_readPing'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'd_field_client.Request_readPing'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
-'d_field_client.Request_readPing'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, Prev, TrUserData) ->
-    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bs:Len/binary, Rest2/binary>> = Rest, {id('decode_msg_client.ReadPing'(Bs, TrUserData), TrUserData), Rest2} end,
-    'dfp_read_field_def_client.Request'(RestF,
-                                        0,
-                                        0,
-                                        F,
-                                        F@_1,
-                                        case Prev of
-                                            '$undef' -> id({readPing, NewFValue}, TrUserData);
-                                            {readPing, MVPrev} -> id({readPing, 'merge_msg_client.ReadPing'(MVPrev, NewFValue, TrUserData)}, TrUserData);
-                                            _ -> id({readPing, NewFValue}, TrUserData)
-                                        end,
-                                        TrUserData).
-
 'skip_varint_client.Request'(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'skip_varint_client.Request'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
 'skip_varint_client.Request'(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_client.Request'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
 
@@ -1644,7 +1445,6 @@ decode_msg_2_doit('client.Response', Bin, TrUserData) -> id('decode_msg_client.R
 'dfp_read_field_def_client.Response'(<<34, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.Response_commit'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
 'dfp_read_field_def_client.Response'(<<42, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.Response_load'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
 'dfp_read_field_def_client.Response'(<<50, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.Response_pong'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
-'dfp_read_field_def_client.Response'(<<66, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.Response_readPong'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
 'dfp_read_field_def_client.Response'(<<>>, 0, 0, _, F@_1, F@_2, _) ->
     S1 = #{seq => F@_1},
     if F@_2 == '$undef' -> S1;
@@ -1662,7 +1462,6 @@ decode_msg_2_doit('client.Response', Bin, TrUserData) -> id('decode_msg_client.R
         34 -> 'd_field_client.Response_commit'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
         42 -> 'd_field_client.Response_load'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
         50 -> 'd_field_client.Response_pong'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
-        66 -> 'd_field_client.Response_readPong'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
         _ ->
             case Key band 7 of
                 0 -> 'skip_varint_client.Response'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
@@ -1755,21 +1554,6 @@ decode_msg_2_doit('client.Response', Bin, TrUserData) -> id('decode_msg_client.R
                                              '$undef' -> id({pong, NewFValue}, TrUserData);
                                              {pong, MVPrev} -> id({pong, 'merge_msg_client.ClientPong'(MVPrev, NewFValue, TrUserData)}, TrUserData);
                                              _ -> id({pong, NewFValue}, TrUserData)
-                                         end,
-                                         TrUserData).
-
-'d_field_client.Response_readPong'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'd_field_client.Response_readPong'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
-'d_field_client.Response_readPong'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, Prev, TrUserData) ->
-    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bs:Len/binary, Rest2/binary>> = Rest, {id('decode_msg_client.ReadPong'(Bs, TrUserData), TrUserData), Rest2} end,
-    'dfp_read_field_def_client.Response'(RestF,
-                                         0,
-                                         0,
-                                         F,
-                                         F@_1,
-                                         case Prev of
-                                             '$undef' -> id({readPong, NewFValue}, TrUserData);
-                                             {readPong, MVPrev} -> id({readPong, 'merge_msg_client.ReadPong'(MVPrev, NewFValue, TrUserData)}, TrUserData);
-                                             _ -> id({readPong, NewFValue}, TrUserData)
                                          end,
                                          TrUserData).
 
@@ -1915,8 +1699,6 @@ merge_msgs(Prev, New, MsgName, Opts) ->
         'client.Release' -> 'merge_msg_client.Release'(Prev, New, TrUserData);
         'client.ClientPing' -> 'merge_msg_client.ClientPing'(Prev, New, TrUserData);
         'client.ClientPong' -> 'merge_msg_client.ClientPong'(Prev, New, TrUserData);
-        'client.ReadPing' -> 'merge_msg_client.ReadPing'(Prev, New, TrUserData);
-        'client.ReadPong' -> 'merge_msg_client.ReadPong'(Prev, New, TrUserData);
         'client.Request' -> 'merge_msg_client.Request'(Prev, New, TrUserData);
         'client.Response' -> 'merge_msg_client.Response'(Prev, New, TrUserData)
     end.
@@ -2089,26 +1871,6 @@ merge_msgs(Prev, New, MsgName, Opts) ->
 -compile({nowarn_unused_function,'merge_msg_client.ClientPong'/3}).
 'merge_msg_client.ClientPong'(_Prev, New, _TrUserData) -> New.
 
--compile({nowarn_unused_function,'merge_msg_client.ReadPing'/3}).
-'merge_msg_client.ReadPing'(PMsg, NMsg, TrUserData) ->
-    S1 = #{},
-    case {PMsg, NMsg} of
-        {#{payload := PFpayload}, #{payload := NFpayload}} -> S1#{payload => 'merge_msg_client.Read'(PFpayload, NFpayload, TrUserData)};
-        {_, #{payload := NFpayload}} -> S1#{payload => NFpayload};
-        {#{payload := PFpayload}, _} -> S1#{payload => PFpayload};
-        {_, _} -> S1
-    end.
-
--compile({nowarn_unused_function,'merge_msg_client.ReadPong'/3}).
-'merge_msg_client.ReadPong'(PMsg, NMsg, TrUserData) ->
-    S1 = #{},
-    case {PMsg, NMsg} of
-        {#{payload := PFpayload}, #{payload := NFpayload}} -> S1#{payload => 'merge_msg_client.ReadReply'(PFpayload, NFpayload, TrUserData)};
-        {_, #{payload := NFpayload}} -> S1#{payload => NFpayload};
-        {#{payload := PFpayload}, _} -> S1#{payload => PFpayload};
-        {_, _} -> S1
-    end.
-
 -compile({nowarn_unused_function,'merge_msg_client.Request'/3}).
 'merge_msg_client.Request'(PMsg, NMsg, TrUserData) ->
     S1 = #{},
@@ -2124,7 +1886,6 @@ merge_msgs(Prev, New, MsgName, Opts) ->
         {#{payload := {release, OPFpayload}}, #{payload := {release, ONFpayload}}} -> S2#{payload => {release, 'merge_msg_client.Release'(OPFpayload, ONFpayload, TrUserData)}};
         {#{payload := {load, OPFpayload}}, #{payload := {load, ONFpayload}}} -> S2#{payload => {load, 'merge_msg_client.Load'(OPFpayload, ONFpayload, TrUserData)}};
         {#{payload := {ping, OPFpayload}}, #{payload := {ping, ONFpayload}}} -> S2#{payload => {ping, 'merge_msg_client.ClientPing'(OPFpayload, ONFpayload, TrUserData)}};
-        {#{payload := {readPing, OPFpayload}}, #{payload := {readPing, ONFpayload}}} -> S2#{payload => {readPing, 'merge_msg_client.ReadPing'(OPFpayload, ONFpayload, TrUserData)}};
         {_, #{payload := NFpayload}} -> S2#{payload => NFpayload};
         {#{payload := PFpayload}, _} -> S2#{payload => PFpayload};
         {_, _} -> S2
@@ -2144,7 +1905,6 @@ merge_msgs(Prev, New, MsgName, Opts) ->
         {#{payload := {commit, OPFpayload}}, #{payload := {commit, ONFpayload}}} -> S2#{payload => {commit, 'merge_msg_client.CommitReply'(OPFpayload, ONFpayload, TrUserData)}};
         {#{payload := {load, OPFpayload}}, #{payload := {load, ONFpayload}}} -> S2#{payload => {load, 'merge_msg_client.LoadReply'(OPFpayload, ONFpayload, TrUserData)}};
         {#{payload := {pong, OPFpayload}}, #{payload := {pong, ONFpayload}}} -> S2#{payload => {pong, 'merge_msg_client.ClientPong'(OPFpayload, ONFpayload, TrUserData)}};
-        {#{payload := {readPong, OPFpayload}}, #{payload := {readPong, ONFpayload}}} -> S2#{payload => {readPong, 'merge_msg_client.ReadPong'(OPFpayload, ONFpayload, TrUserData)}};
         {_, #{payload := NFpayload}} -> S2#{payload => NFpayload};
         {#{payload := PFpayload}, _} -> S2#{payload => PFpayload};
         {_, _} -> S2
@@ -2167,8 +1927,6 @@ verify_msg(Msg, MsgName, Opts) ->
         'client.Release' -> 'v_msg_client.Release'(Msg, [MsgName], TrUserData);
         'client.ClientPing' -> 'v_msg_client.ClientPing'(Msg, [MsgName], TrUserData);
         'client.ClientPong' -> 'v_msg_client.ClientPong'(Msg, [MsgName], TrUserData);
-        'client.ReadPing' -> 'v_msg_client.ReadPing'(Msg, [MsgName], TrUserData);
-        'client.ReadPong' -> 'v_msg_client.ReadPong'(Msg, [MsgName], TrUserData);
         'client.Request' -> 'v_msg_client.Request'(Msg, [MsgName], TrUserData);
         'client.Response' -> 'v_msg_client.Response'(Msg, [MsgName], TrUserData);
         _ -> mk_type_error(not_a_known_message, Msg, [])
@@ -2406,36 +2164,6 @@ verify_msg(Msg, MsgName, Opts) ->
 'v_msg_client.ClientPong'(M, Path, _TrUserData) when is_map(M) -> mk_type_error({missing_fields, [] -- maps:keys(M), 'client.ClientPong'}, M, Path);
 'v_msg_client.ClientPong'(X, Path, _TrUserData) -> mk_type_error({expected_msg, 'client.ClientPong'}, X, Path).
 
--compile({nowarn_unused_function,'v_msg_client.ReadPing'/3}).
--dialyzer({nowarn_function,'v_msg_client.ReadPing'/3}).
-'v_msg_client.ReadPing'(#{} = M, Path, TrUserData) ->
-    case M of
-        #{payload := F1} -> 'v_msg_client.Read'(F1, [payload | Path], TrUserData);
-        _ -> ok
-    end,
-    lists:foreach(fun (payload) -> ok;
-                      (OtherKey) -> mk_type_error({extraneous_key, OtherKey}, M, Path)
-                  end,
-                  maps:keys(M)),
-    ok;
-'v_msg_client.ReadPing'(M, Path, _TrUserData) when is_map(M) -> mk_type_error({missing_fields, [] -- maps:keys(M), 'client.ReadPing'}, M, Path);
-'v_msg_client.ReadPing'(X, Path, _TrUserData) -> mk_type_error({expected_msg, 'client.ReadPing'}, X, Path).
-
--compile({nowarn_unused_function,'v_msg_client.ReadPong'/3}).
--dialyzer({nowarn_function,'v_msg_client.ReadPong'/3}).
-'v_msg_client.ReadPong'(#{} = M, Path, TrUserData) ->
-    case M of
-        #{payload := F1} -> 'v_msg_client.ReadReply'(F1, [payload | Path], TrUserData);
-        _ -> ok
-    end,
-    lists:foreach(fun (payload) -> ok;
-                      (OtherKey) -> mk_type_error({extraneous_key, OtherKey}, M, Path)
-                  end,
-                  maps:keys(M)),
-    ok;
-'v_msg_client.ReadPong'(M, Path, _TrUserData) when is_map(M) -> mk_type_error({missing_fields, [] -- maps:keys(M), 'client.ReadPong'}, M, Path);
-'v_msg_client.ReadPong'(X, Path, _TrUserData) -> mk_type_error({expected_msg, 'client.ReadPong'}, X, Path).
-
 -compile({nowarn_unused_function,'v_msg_client.Request'/3}).
 -dialyzer({nowarn_function,'v_msg_client.Request'/3}).
 'v_msg_client.Request'(#{} = M, Path, TrUserData) ->
@@ -2450,7 +2178,6 @@ verify_msg(Msg, MsgName, Opts) ->
         #{payload := {release, OF2}} -> 'v_msg_client.Release'(OF2, [release, payload | Path], TrUserData);
         #{payload := {load, OF2}} -> 'v_msg_client.Load'(OF2, [load, payload | Path], TrUserData);
         #{payload := {ping, OF2}} -> 'v_msg_client.ClientPing'(OF2, [ping, payload | Path], TrUserData);
-        #{payload := {readPing, OF2}} -> 'v_msg_client.ReadPing'(OF2, [readPing, payload | Path], TrUserData);
         #{payload := F2} -> mk_type_error(invalid_oneof, F2, [payload | Path]);
         _ -> ok
     end,
@@ -2476,7 +2203,6 @@ verify_msg(Msg, MsgName, Opts) ->
         #{payload := {commit, OF2}} -> 'v_msg_client.CommitReply'(OF2, [commit, payload | Path], TrUserData);
         #{payload := {load, OF2}} -> 'v_msg_client.LoadReply'(OF2, [load, payload | Path], TrUserData);
         #{payload := {pong, OF2}} -> 'v_msg_client.ClientPong'(OF2, [pong, payload | Path], TrUserData);
-        #{payload := {readPong, OF2}} -> 'v_msg_client.ReadPong'(OF2, [readPong, payload | Path], TrUserData);
         #{payload := F2} -> mk_type_error(invalid_oneof, F2, [payload | Path]);
         _ -> ok
     end,
