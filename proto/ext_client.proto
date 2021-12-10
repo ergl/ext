@@ -59,6 +59,14 @@ message ClientPing {
 
 message ClientPong {}
 
+message NoTxRead {
+  bytes key = 1;
+}
+
+message NoTxReadReply {
+  bytes data = 1;
+}
+
 message Request {
   uint32 seq = 1;
   oneof payload {
@@ -68,6 +76,7 @@ message Request {
     Release release = 5;
     Load load = 6;
     ClientPing ping = 7;
+    NoTxRead no_tx_read = 8;
   }
 }
 
@@ -79,5 +88,6 @@ message Response {
     CommitReply commit = 4;
     LoadReply load = 5;
     ClientPong pong = 6;
+    NoTxReadReply no_tx_read = 8;
   }
 }

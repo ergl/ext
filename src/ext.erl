@@ -29,6 +29,11 @@
 -export([commit/2,
          release/2]).
 
+%% Non-transactional API
+-export([async_read_no_tx/2,
+         await_read_no_tx/2,
+         sync_read_no_tx/2]).
+
 -record(coordinator, {
     %% The IP we're using to talk to the server
     %% Used to create a transaction id
@@ -58,7 +63,9 @@
 -opaque read_req_id() :: {read, shackle:external_request_id(), index_node()}.
 -opaque update_req_id() :: {update, shackle:external_request_id(), index_node()}.
 
--export_type([t/0, tx/0, read_req_id/0, update_req_id/0]).
+-opaque no_tx_read_req_id() :: {read, shackle:external_request_id()}.
+
+-export_type([t/0, tx/0, read_req_id/0, update_req_id/0, no_tx_read_req_id/0]).
 
 %%====================================================================
 %% Library APP functions
@@ -218,6 +225,26 @@ ping(#coordinator{ring=Ring, conn_pool=Pools},
     Pool = maps:get(Node, Pools),
     {ok, ReqId} = ext_shackle_transport:ping(Pool, TxId),
     shackle:receive_response(ReqId).
+
+%%====================================================================
+%% Non-transactional interface
+%%====================================================================
+
+-spec async_read_no_tx(t(), binary()) -> {ok, no_tx_read_req_id()}.
+async_read_no_tx(#coordinator{ring=Ring, conn_pool=Pools}, Key) ->
+    {_, Node} = ext_ring:get_key_location(Ring, Key),
+    Pool = maps:get(Node, Pools),
+    {ok, ReqId} = ext_shackle_transport:read_request_no_tx(Pool, Key),
+    {ok, {read, ReqId}}.
+
+-spec await_read_no_tx(t(), no_tx_read_req_id()) -> {ok, binary()}.
+await_read_no_tx(_, {read, ReqId}) ->
+    shackle:receive_response(ReqId).
+
+-spec sync_read_no_tx(t(), binary()) -> {ok, binary()}.
+sync_read_no_tx(Coord, Key) ->
+    {ok, Req} = async_read_no_tx(Coord, Key),
+    await_read_no_tx(Coord, Req).
 
 %%====================================================================
 %% Internal functions

@@ -78,19 +78,27 @@
       #{
        }.
 
+-type 'client.NoTxRead'() ::
+      #{key                     => iodata()         % = 1, optional
+       }.
+
+-type 'client.NoTxReadReply'() ::
+      #{data                    => iodata()         % = 1, optional
+       }.
+
 -type 'client.Request'() ::
       #{seq                     => non_neg_integer(), % = 1, optional, 32 bits
-        payload                 => {read, 'client.Read'()} | {update, 'client.Update'()} | {commit, 'client.Commit'()} | {release, 'client.Release'()} | {load, 'client.Load'()} | {ping, 'client.ClientPing'()} % oneof
+        payload                 => {read, 'client.Read'()} | {update, 'client.Update'()} | {commit, 'client.Commit'()} | {release, 'client.Release'()} | {load, 'client.Load'()} | {ping, 'client.ClientPing'()} | {no_tx_read, 'client.NoTxRead'()} % oneof
        }.
 
 -type 'client.Response'() ::
       #{seq                     => non_neg_integer(), % = 1, optional, 32 bits
-        payload                 => {read, 'client.ReadReply'()} | {update, 'client.UpdateReply'()} | {commit, 'client.CommitReply'()} | {load, 'client.LoadReply'()} | {pong, 'client.ClientPong'()} % oneof
+        payload                 => {read, 'client.ReadReply'()} | {update, 'client.UpdateReply'()} | {commit, 'client.CommitReply'()} | {load, 'client.LoadReply'()} | {pong, 'client.ClientPong'()} | {no_tx_read, 'client.NoTxReadReply'()} % oneof
        }.
 
--export_type(['client.Load'/0, 'client.LoadReply'/0, 'client.Read'/0, 'client.ReadReply'/0, 'client.Update'/0, 'client.UpdateReply'/0, 'client.Commit'/0, 'client.CommitReply'/0, 'client.Release'/0, 'client.ClientPing'/0, 'client.ClientPong'/0, 'client.Request'/0, 'client.Response'/0]).
--type '$msg_name'() :: 'client.Load' | 'client.LoadReply' | 'client.Read' | 'client.ReadReply' | 'client.Update' | 'client.UpdateReply' | 'client.Commit' | 'client.CommitReply' | 'client.Release' | 'client.ClientPing' | 'client.ClientPong' | 'client.Request' | 'client.Response'.
--type '$msg'() :: 'client.Load'() | 'client.LoadReply'() | 'client.Read'() | 'client.ReadReply'() | 'client.Update'() | 'client.UpdateReply'() | 'client.Commit'() | 'client.CommitReply'() | 'client.Release'() | 'client.ClientPing'() | 'client.ClientPong'() | 'client.Request'() | 'client.Response'().
+-export_type(['client.Load'/0, 'client.LoadReply'/0, 'client.Read'/0, 'client.ReadReply'/0, 'client.Update'/0, 'client.UpdateReply'/0, 'client.Commit'/0, 'client.CommitReply'/0, 'client.Release'/0, 'client.ClientPing'/0, 'client.ClientPong'/0, 'client.NoTxRead'/0, 'client.NoTxReadReply'/0, 'client.Request'/0, 'client.Response'/0]).
+-type '$msg_name'() :: 'client.Load' | 'client.LoadReply' | 'client.Read' | 'client.ReadReply' | 'client.Update' | 'client.UpdateReply' | 'client.Commit' | 'client.CommitReply' | 'client.Release' | 'client.ClientPing' | 'client.ClientPong' | 'client.NoTxRead' | 'client.NoTxReadReply' | 'client.Request' | 'client.Response'.
+-type '$msg'() :: 'client.Load'() | 'client.LoadReply'() | 'client.Read'() | 'client.ReadReply'() | 'client.Update'() | 'client.UpdateReply'() | 'client.Commit'() | 'client.CommitReply'() | 'client.Release'() | 'client.ClientPing'() | 'client.ClientPong'() | 'client.NoTxRead'() | 'client.NoTxReadReply'() | 'client.Request'() | 'client.Response'().
 -export_type(['$msg_name'/0, '$msg'/0]).
 
 -dialyzer({no_underspecs, encode_msg/2}).
@@ -117,6 +125,8 @@ encode_msg(Msg, MsgName, Opts) ->
         'client.Release' -> 'encode_msg_client.Release'(id(Msg, TrUserData), TrUserData);
         'client.ClientPing' -> 'encode_msg_client.ClientPing'(id(Msg, TrUserData), TrUserData);
         'client.ClientPong' -> 'encode_msg_client.ClientPong'(id(Msg, TrUserData), TrUserData);
+        'client.NoTxRead' -> 'encode_msg_client.NoTxRead'(id(Msg, TrUserData), TrUserData);
+        'client.NoTxReadReply' -> 'encode_msg_client.NoTxReadReply'(id(Msg, TrUserData), TrUserData);
         'client.Request' -> 'encode_msg_client.Request'(id(Msg, TrUserData), TrUserData);
         'client.Response' -> 'encode_msg_client.Response'(id(Msg, TrUserData), TrUserData)
     end.
@@ -420,6 +430,38 @@ encode_msg(Msg, MsgName, Opts) ->
 
 'encode_msg_client.ClientPong'(_Msg, _TrUserData) -> <<>>.
 
+'encode_msg_client.NoTxRead'(Msg, TrUserData) -> 'encode_msg_client.NoTxRead'(Msg, <<>>, TrUserData).
+
+
+'encode_msg_client.NoTxRead'(#{} = M, Bin, TrUserData) ->
+    case M of
+        #{key := F1} ->
+            begin
+                TrF1 = id(F1, TrUserData),
+                case iolist_size(TrF1) of
+                    0 -> Bin;
+                    _ -> e_type_bytes(TrF1, <<Bin/binary, 10>>, TrUserData)
+                end
+            end;
+        _ -> Bin
+    end.
+
+'encode_msg_client.NoTxReadReply'(Msg, TrUserData) -> 'encode_msg_client.NoTxReadReply'(Msg, <<>>, TrUserData).
+
+
+'encode_msg_client.NoTxReadReply'(#{} = M, Bin, TrUserData) ->
+    case M of
+        #{data := F1} ->
+            begin
+                TrF1 = id(F1, TrUserData),
+                case iolist_size(TrF1) of
+                    0 -> Bin;
+                    _ -> e_type_bytes(TrF1, <<Bin/binary, 10>>, TrUserData)
+                end
+            end;
+        _ -> Bin
+    end.
+
 'encode_msg_client.Request'(Msg, TrUserData) -> 'encode_msg_client.Request'(Msg, <<>>, TrUserData).
 
 
@@ -442,7 +484,8 @@ encode_msg(Msg, MsgName, Opts) ->
                 {commit, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Request_commit'(TrTF2, <<B1/binary, 34>>, TrUserData) end;
                 {release, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Request_release'(TrTF2, <<B1/binary, 42>>, TrUserData) end;
                 {load, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Request_load'(TrTF2, <<B1/binary, 50>>, TrUserData) end;
-                {ping, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Request_ping'(TrTF2, <<B1/binary, 58>>, TrUserData) end
+                {ping, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Request_ping'(TrTF2, <<B1/binary, 58>>, TrUserData) end;
+                {no_tx_read, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Request_no_tx_read'(TrTF2, <<B1/binary, 66>>, TrUserData) end
             end;
         _ -> B1
     end.
@@ -468,7 +511,8 @@ encode_msg(Msg, MsgName, Opts) ->
                 {update, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Response_update'(TrTF2, <<B1/binary, 26>>, TrUserData) end;
                 {commit, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Response_commit'(TrTF2, <<B1/binary, 34>>, TrUserData) end;
                 {load, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Response_load'(TrTF2, <<B1/binary, 42>>, TrUserData) end;
-                {pong, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Response_pong'(TrTF2, <<B1/binary, 50>>, TrUserData) end
+                {pong, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Response_pong'(TrTF2, <<B1/binary, 50>>, TrUserData) end;
+                {no_tx_read, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Response_no_tx_read'(TrTF2, <<B1/binary, 66>>, TrUserData) end
             end;
         _ -> B1
     end.
@@ -514,6 +558,11 @@ encode_msg(Msg, MsgName, Opts) ->
     Bin2 = e_varint(byte_size(SubBin), Bin),
     <<Bin2/binary, SubBin/binary>>.
 
+'e_mfield_client.Request_no_tx_read'(Msg, Bin, TrUserData) ->
+    SubBin = 'encode_msg_client.NoTxRead'(Msg, <<>>, TrUserData),
+    Bin2 = e_varint(byte_size(SubBin), Bin),
+    <<Bin2/binary, SubBin/binary>>.
+
 'e_mfield_client.Response_read'(Msg, Bin, TrUserData) ->
     SubBin = 'encode_msg_client.ReadReply'(Msg, <<>>, TrUserData),
     Bin2 = e_varint(byte_size(SubBin), Bin),
@@ -532,6 +581,11 @@ encode_msg(Msg, MsgName, Opts) ->
 'e_mfield_client.Response_load'(_Msg, Bin, _TrUserData) -> <<Bin/binary, 0>>.
 
 'e_mfield_client.Response_pong'(_Msg, Bin, _TrUserData) -> <<Bin/binary, 0>>.
+
+'e_mfield_client.Response_no_tx_read'(Msg, Bin, TrUserData) ->
+    SubBin = 'encode_msg_client.NoTxReadReply'(Msg, <<>>, TrUserData),
+    Bin2 = e_varint(byte_size(SubBin), Bin),
+    <<Bin2/binary, SubBin/binary>>.
 
 'encode_msg_map<uint32,uint32>'(#{key := F1, value := F2}, Bin, TrUserData) ->
     B1 = begin TrF1 = id(F1, TrUserData), e_varint(TrF1, <<Bin/binary, 8>>, TrUserData) end,
@@ -686,6 +740,8 @@ decode_msg_2_doit('client.CommitReply', Bin, TrUserData) -> id('decode_msg_clien
 decode_msg_2_doit('client.Release', Bin, TrUserData) -> id('decode_msg_client.Release'(Bin, TrUserData), TrUserData);
 decode_msg_2_doit('client.ClientPing', Bin, TrUserData) -> id('decode_msg_client.ClientPing'(Bin, TrUserData), TrUserData);
 decode_msg_2_doit('client.ClientPong', Bin, TrUserData) -> id('decode_msg_client.ClientPong'(Bin, TrUserData), TrUserData);
+decode_msg_2_doit('client.NoTxRead', Bin, TrUserData) -> id('decode_msg_client.NoTxRead'(Bin, TrUserData), TrUserData);
+decode_msg_2_doit('client.NoTxReadReply', Bin, TrUserData) -> id('decode_msg_client.NoTxReadReply'(Bin, TrUserData), TrUserData);
 decode_msg_2_doit('client.Request', Bin, TrUserData) -> id('decode_msg_client.Request'(Bin, TrUserData), TrUserData);
 decode_msg_2_doit('client.Response', Bin, TrUserData) -> id('decode_msg_client.Response'(Bin, TrUserData), TrUserData).
 
@@ -1283,6 +1339,94 @@ decode_msg_2_doit('client.Response', Bin, TrUserData) -> id('decode_msg_client.R
 
 'skip_64_client.ClientPong'(<<_:64, Rest/binary>>, Z1, Z2, F, TrUserData) -> 'dfp_read_field_def_client.ClientPong'(Rest, Z1, Z2, F, TrUserData).
 
+'decode_msg_client.NoTxRead'(Bin, TrUserData) -> 'dfp_read_field_def_client.NoTxRead'(Bin, 0, 0, 0, id(<<>>, TrUserData), TrUserData).
+
+'dfp_read_field_def_client.NoTxRead'(<<10, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> 'd_field_client.NoTxRead_key'(Rest, Z1, Z2, F, F@_1, TrUserData);
+'dfp_read_field_def_client.NoTxRead'(<<>>, 0, 0, _, F@_1, _) -> #{key => F@_1};
+'dfp_read_field_def_client.NoTxRead'(Other, Z1, Z2, F, F@_1, TrUserData) -> 'dg_read_field_def_client.NoTxRead'(Other, Z1, Z2, F, F@_1, TrUserData).
+
+'dg_read_field_def_client.NoTxRead'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, TrUserData) when N < 32 - 7 -> 'dg_read_field_def_client.NoTxRead'(Rest, N + 7, X bsl N + Acc, F, F@_1, TrUserData);
+'dg_read_field_def_client.NoTxRead'(<<0:1, X:7, Rest/binary>>, N, Acc, _, F@_1, TrUserData) ->
+    Key = X bsl N + Acc,
+    case Key of
+        10 -> 'd_field_client.NoTxRead_key'(Rest, 0, 0, 0, F@_1, TrUserData);
+        _ ->
+            case Key band 7 of
+                0 -> 'skip_varint_client.NoTxRead'(Rest, 0, 0, Key bsr 3, F@_1, TrUserData);
+                1 -> 'skip_64_client.NoTxRead'(Rest, 0, 0, Key bsr 3, F@_1, TrUserData);
+                2 -> 'skip_length_delimited_client.NoTxRead'(Rest, 0, 0, Key bsr 3, F@_1, TrUserData);
+                3 -> 'skip_group_client.NoTxRead'(Rest, 0, 0, Key bsr 3, F@_1, TrUserData);
+                5 -> 'skip_32_client.NoTxRead'(Rest, 0, 0, Key bsr 3, F@_1, TrUserData)
+            end
+    end;
+'dg_read_field_def_client.NoTxRead'(<<>>, 0, 0, _, F@_1, _) -> #{key => F@_1}.
+
+'d_field_client.NoTxRead_key'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, TrUserData) when N < 57 -> 'd_field_client.NoTxRead_key'(Rest, N + 7, X bsl N + Acc, F, F@_1, TrUserData);
+'d_field_client.NoTxRead_key'(<<0:1, X:7, Rest/binary>>, N, Acc, F, _, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bytes:Len/binary, Rest2/binary>> = Rest, Bytes2 = binary:copy(Bytes), {id(Bytes2, TrUserData), Rest2} end,
+    'dfp_read_field_def_client.NoTxRead'(RestF, 0, 0, F, NewFValue, TrUserData).
+
+'skip_varint_client.NoTxRead'(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> 'skip_varint_client.NoTxRead'(Rest, Z1, Z2, F, F@_1, TrUserData);
+'skip_varint_client.NoTxRead'(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> 'dfp_read_field_def_client.NoTxRead'(Rest, Z1, Z2, F, F@_1, TrUserData).
+
+'skip_length_delimited_client.NoTxRead'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, TrUserData) when N < 57 -> 'skip_length_delimited_client.NoTxRead'(Rest, N + 7, X bsl N + Acc, F, F@_1, TrUserData);
+'skip_length_delimited_client.NoTxRead'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, TrUserData) ->
+    Length = X bsl N + Acc,
+    <<_:Length/binary, Rest2/binary>> = Rest,
+    'dfp_read_field_def_client.NoTxRead'(Rest2, 0, 0, F, F@_1, TrUserData).
+
+'skip_group_client.NoTxRead'(Bin, _, Z2, FNum, F@_1, TrUserData) ->
+    {_, Rest} = read_group(Bin, FNum),
+    'dfp_read_field_def_client.NoTxRead'(Rest, 0, Z2, FNum, F@_1, TrUserData).
+
+'skip_32_client.NoTxRead'(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> 'dfp_read_field_def_client.NoTxRead'(Rest, Z1, Z2, F, F@_1, TrUserData).
+
+'skip_64_client.NoTxRead'(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> 'dfp_read_field_def_client.NoTxRead'(Rest, Z1, Z2, F, F@_1, TrUserData).
+
+'decode_msg_client.NoTxReadReply'(Bin, TrUserData) -> 'dfp_read_field_def_client.NoTxReadReply'(Bin, 0, 0, 0, id(<<>>, TrUserData), TrUserData).
+
+'dfp_read_field_def_client.NoTxReadReply'(<<10, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> 'd_field_client.NoTxReadReply_data'(Rest, Z1, Z2, F, F@_1, TrUserData);
+'dfp_read_field_def_client.NoTxReadReply'(<<>>, 0, 0, _, F@_1, _) -> #{data => F@_1};
+'dfp_read_field_def_client.NoTxReadReply'(Other, Z1, Z2, F, F@_1, TrUserData) -> 'dg_read_field_def_client.NoTxReadReply'(Other, Z1, Z2, F, F@_1, TrUserData).
+
+'dg_read_field_def_client.NoTxReadReply'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, TrUserData) when N < 32 - 7 -> 'dg_read_field_def_client.NoTxReadReply'(Rest, N + 7, X bsl N + Acc, F, F@_1, TrUserData);
+'dg_read_field_def_client.NoTxReadReply'(<<0:1, X:7, Rest/binary>>, N, Acc, _, F@_1, TrUserData) ->
+    Key = X bsl N + Acc,
+    case Key of
+        10 -> 'd_field_client.NoTxReadReply_data'(Rest, 0, 0, 0, F@_1, TrUserData);
+        _ ->
+            case Key band 7 of
+                0 -> 'skip_varint_client.NoTxReadReply'(Rest, 0, 0, Key bsr 3, F@_1, TrUserData);
+                1 -> 'skip_64_client.NoTxReadReply'(Rest, 0, 0, Key bsr 3, F@_1, TrUserData);
+                2 -> 'skip_length_delimited_client.NoTxReadReply'(Rest, 0, 0, Key bsr 3, F@_1, TrUserData);
+                3 -> 'skip_group_client.NoTxReadReply'(Rest, 0, 0, Key bsr 3, F@_1, TrUserData);
+                5 -> 'skip_32_client.NoTxReadReply'(Rest, 0, 0, Key bsr 3, F@_1, TrUserData)
+            end
+    end;
+'dg_read_field_def_client.NoTxReadReply'(<<>>, 0, 0, _, F@_1, _) -> #{data => F@_1}.
+
+'d_field_client.NoTxReadReply_data'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, TrUserData) when N < 57 -> 'd_field_client.NoTxReadReply_data'(Rest, N + 7, X bsl N + Acc, F, F@_1, TrUserData);
+'d_field_client.NoTxReadReply_data'(<<0:1, X:7, Rest/binary>>, N, Acc, F, _, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bytes:Len/binary, Rest2/binary>> = Rest, Bytes2 = binary:copy(Bytes), {id(Bytes2, TrUserData), Rest2} end,
+    'dfp_read_field_def_client.NoTxReadReply'(RestF, 0, 0, F, NewFValue, TrUserData).
+
+'skip_varint_client.NoTxReadReply'(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> 'skip_varint_client.NoTxReadReply'(Rest, Z1, Z2, F, F@_1, TrUserData);
+'skip_varint_client.NoTxReadReply'(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> 'dfp_read_field_def_client.NoTxReadReply'(Rest, Z1, Z2, F, F@_1, TrUserData).
+
+'skip_length_delimited_client.NoTxReadReply'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, TrUserData) when N < 57 -> 'skip_length_delimited_client.NoTxReadReply'(Rest, N + 7, X bsl N + Acc, F, F@_1, TrUserData);
+'skip_length_delimited_client.NoTxReadReply'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, TrUserData) ->
+    Length = X bsl N + Acc,
+    <<_:Length/binary, Rest2/binary>> = Rest,
+    'dfp_read_field_def_client.NoTxReadReply'(Rest2, 0, 0, F, F@_1, TrUserData).
+
+'skip_group_client.NoTxReadReply'(Bin, _, Z2, FNum, F@_1, TrUserData) ->
+    {_, Rest} = read_group(Bin, FNum),
+    'dfp_read_field_def_client.NoTxReadReply'(Rest, 0, Z2, FNum, F@_1, TrUserData).
+
+'skip_32_client.NoTxReadReply'(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> 'dfp_read_field_def_client.NoTxReadReply'(Rest, Z1, Z2, F, F@_1, TrUserData).
+
+'skip_64_client.NoTxReadReply'(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> 'dfp_read_field_def_client.NoTxReadReply'(Rest, Z1, Z2, F, F@_1, TrUserData).
+
 'decode_msg_client.Request'(Bin, TrUserData) -> 'dfp_read_field_def_client.Request'(Bin, 0, 0, 0, id(0, TrUserData), id('$undef', TrUserData), TrUserData).
 
 'dfp_read_field_def_client.Request'(<<8, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.Request_seq'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
@@ -1292,6 +1436,7 @@ decode_msg_2_doit('client.Response', Bin, TrUserData) -> id('decode_msg_client.R
 'dfp_read_field_def_client.Request'(<<42, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.Request_release'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
 'dfp_read_field_def_client.Request'(<<50, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.Request_load'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
 'dfp_read_field_def_client.Request'(<<58, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.Request_ping'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+'dfp_read_field_def_client.Request'(<<66, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.Request_no_tx_read'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
 'dfp_read_field_def_client.Request'(<<>>, 0, 0, _, F@_1, F@_2, _) ->
     S1 = #{seq => F@_1},
     if F@_2 == '$undef' -> S1;
@@ -1310,6 +1455,7 @@ decode_msg_2_doit('client.Response', Bin, TrUserData) -> id('decode_msg_client.R
         42 -> 'd_field_client.Request_release'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
         50 -> 'd_field_client.Request_load'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
         58 -> 'd_field_client.Request_ping'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
+        66 -> 'd_field_client.Request_no_tx_read'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
         _ ->
             case Key band 7 of
                 0 -> 'skip_varint_client.Request'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
@@ -1420,6 +1566,21 @@ decode_msg_2_doit('client.Response', Bin, TrUserData) -> id('decode_msg_client.R
                                         end,
                                         TrUserData).
 
+'d_field_client.Request_no_tx_read'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'd_field_client.Request_no_tx_read'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'d_field_client.Request_no_tx_read'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, Prev, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bs:Len/binary, Rest2/binary>> = Rest, {id('decode_msg_client.NoTxRead'(Bs, TrUserData), TrUserData), Rest2} end,
+    'dfp_read_field_def_client.Request'(RestF,
+                                        0,
+                                        0,
+                                        F,
+                                        F@_1,
+                                        case Prev of
+                                            '$undef' -> id({no_tx_read, NewFValue}, TrUserData);
+                                            {no_tx_read, MVPrev} -> id({no_tx_read, 'merge_msg_client.NoTxRead'(MVPrev, NewFValue, TrUserData)}, TrUserData);
+                                            _ -> id({no_tx_read, NewFValue}, TrUserData)
+                                        end,
+                                        TrUserData).
+
 'skip_varint_client.Request'(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'skip_varint_client.Request'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
 'skip_varint_client.Request'(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_client.Request'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
 
@@ -1445,6 +1606,7 @@ decode_msg_2_doit('client.Response', Bin, TrUserData) -> id('decode_msg_client.R
 'dfp_read_field_def_client.Response'(<<34, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.Response_commit'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
 'dfp_read_field_def_client.Response'(<<42, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.Response_load'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
 'dfp_read_field_def_client.Response'(<<50, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.Response_pong'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+'dfp_read_field_def_client.Response'(<<66, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.Response_no_tx_read'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
 'dfp_read_field_def_client.Response'(<<>>, 0, 0, _, F@_1, F@_2, _) ->
     S1 = #{seq => F@_1},
     if F@_2 == '$undef' -> S1;
@@ -1462,6 +1624,7 @@ decode_msg_2_doit('client.Response', Bin, TrUserData) -> id('decode_msg_client.R
         34 -> 'd_field_client.Response_commit'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
         42 -> 'd_field_client.Response_load'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
         50 -> 'd_field_client.Response_pong'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
+        66 -> 'd_field_client.Response_no_tx_read'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
         _ ->
             case Key band 7 of
                 0 -> 'skip_varint_client.Response'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
@@ -1554,6 +1717,21 @@ decode_msg_2_doit('client.Response', Bin, TrUserData) -> id('decode_msg_client.R
                                              '$undef' -> id({pong, NewFValue}, TrUserData);
                                              {pong, MVPrev} -> id({pong, 'merge_msg_client.ClientPong'(MVPrev, NewFValue, TrUserData)}, TrUserData);
                                              _ -> id({pong, NewFValue}, TrUserData)
+                                         end,
+                                         TrUserData).
+
+'d_field_client.Response_no_tx_read'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'd_field_client.Response_no_tx_read'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'d_field_client.Response_no_tx_read'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, Prev, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bs:Len/binary, Rest2/binary>> = Rest, {id('decode_msg_client.NoTxReadReply'(Bs, TrUserData), TrUserData), Rest2} end,
+    'dfp_read_field_def_client.Response'(RestF,
+                                         0,
+                                         0,
+                                         F,
+                                         F@_1,
+                                         case Prev of
+                                             '$undef' -> id({no_tx_read, NewFValue}, TrUserData);
+                                             {no_tx_read, MVPrev} -> id({no_tx_read, 'merge_msg_client.NoTxReadReply'(MVPrev, NewFValue, TrUserData)}, TrUserData);
+                                             _ -> id({no_tx_read, NewFValue}, TrUserData)
                                          end,
                                          TrUserData).
 
@@ -1699,6 +1877,8 @@ merge_msgs(Prev, New, MsgName, Opts) ->
         'client.Release' -> 'merge_msg_client.Release'(Prev, New, TrUserData);
         'client.ClientPing' -> 'merge_msg_client.ClientPing'(Prev, New, TrUserData);
         'client.ClientPong' -> 'merge_msg_client.ClientPong'(Prev, New, TrUserData);
+        'client.NoTxRead' -> 'merge_msg_client.NoTxRead'(Prev, New, TrUserData);
+        'client.NoTxReadReply' -> 'merge_msg_client.NoTxReadReply'(Prev, New, TrUserData);
         'client.Request' -> 'merge_msg_client.Request'(Prev, New, TrUserData);
         'client.Response' -> 'merge_msg_client.Response'(Prev, New, TrUserData)
     end.
@@ -1871,6 +2051,24 @@ merge_msgs(Prev, New, MsgName, Opts) ->
 -compile({nowarn_unused_function,'merge_msg_client.ClientPong'/3}).
 'merge_msg_client.ClientPong'(_Prev, New, _TrUserData) -> New.
 
+-compile({nowarn_unused_function,'merge_msg_client.NoTxRead'/3}).
+'merge_msg_client.NoTxRead'(PMsg, NMsg, _) ->
+    S1 = #{},
+    case {PMsg, NMsg} of
+        {_, #{key := NFkey}} -> S1#{key => NFkey};
+        {#{key := PFkey}, _} -> S1#{key => PFkey};
+        _ -> S1
+    end.
+
+-compile({nowarn_unused_function,'merge_msg_client.NoTxReadReply'/3}).
+'merge_msg_client.NoTxReadReply'(PMsg, NMsg, _) ->
+    S1 = #{},
+    case {PMsg, NMsg} of
+        {_, #{data := NFdata}} -> S1#{data => NFdata};
+        {#{data := PFdata}, _} -> S1#{data => PFdata};
+        _ -> S1
+    end.
+
 -compile({nowarn_unused_function,'merge_msg_client.Request'/3}).
 'merge_msg_client.Request'(PMsg, NMsg, TrUserData) ->
     S1 = #{},
@@ -1886,6 +2084,7 @@ merge_msgs(Prev, New, MsgName, Opts) ->
         {#{payload := {release, OPFpayload}}, #{payload := {release, ONFpayload}}} -> S2#{payload => {release, 'merge_msg_client.Release'(OPFpayload, ONFpayload, TrUserData)}};
         {#{payload := {load, OPFpayload}}, #{payload := {load, ONFpayload}}} -> S2#{payload => {load, 'merge_msg_client.Load'(OPFpayload, ONFpayload, TrUserData)}};
         {#{payload := {ping, OPFpayload}}, #{payload := {ping, ONFpayload}}} -> S2#{payload => {ping, 'merge_msg_client.ClientPing'(OPFpayload, ONFpayload, TrUserData)}};
+        {#{payload := {no_tx_read, OPFpayload}}, #{payload := {no_tx_read, ONFpayload}}} -> S2#{payload => {no_tx_read, 'merge_msg_client.NoTxRead'(OPFpayload, ONFpayload, TrUserData)}};
         {_, #{payload := NFpayload}} -> S2#{payload => NFpayload};
         {#{payload := PFpayload}, _} -> S2#{payload => PFpayload};
         {_, _} -> S2
@@ -1905,6 +2104,7 @@ merge_msgs(Prev, New, MsgName, Opts) ->
         {#{payload := {commit, OPFpayload}}, #{payload := {commit, ONFpayload}}} -> S2#{payload => {commit, 'merge_msg_client.CommitReply'(OPFpayload, ONFpayload, TrUserData)}};
         {#{payload := {load, OPFpayload}}, #{payload := {load, ONFpayload}}} -> S2#{payload => {load, 'merge_msg_client.LoadReply'(OPFpayload, ONFpayload, TrUserData)}};
         {#{payload := {pong, OPFpayload}}, #{payload := {pong, ONFpayload}}} -> S2#{payload => {pong, 'merge_msg_client.ClientPong'(OPFpayload, ONFpayload, TrUserData)}};
+        {#{payload := {no_tx_read, OPFpayload}}, #{payload := {no_tx_read, ONFpayload}}} -> S2#{payload => {no_tx_read, 'merge_msg_client.NoTxReadReply'(OPFpayload, ONFpayload, TrUserData)}};
         {_, #{payload := NFpayload}} -> S2#{payload => NFpayload};
         {#{payload := PFpayload}, _} -> S2#{payload => PFpayload};
         {_, _} -> S2
@@ -1927,6 +2127,8 @@ verify_msg(Msg, MsgName, Opts) ->
         'client.Release' -> 'v_msg_client.Release'(Msg, [MsgName], TrUserData);
         'client.ClientPing' -> 'v_msg_client.ClientPing'(Msg, [MsgName], TrUserData);
         'client.ClientPong' -> 'v_msg_client.ClientPong'(Msg, [MsgName], TrUserData);
+        'client.NoTxRead' -> 'v_msg_client.NoTxRead'(Msg, [MsgName], TrUserData);
+        'client.NoTxReadReply' -> 'v_msg_client.NoTxReadReply'(Msg, [MsgName], TrUserData);
         'client.Request' -> 'v_msg_client.Request'(Msg, [MsgName], TrUserData);
         'client.Response' -> 'v_msg_client.Response'(Msg, [MsgName], TrUserData);
         _ -> mk_type_error(not_a_known_message, Msg, [])
@@ -2164,6 +2366,36 @@ verify_msg(Msg, MsgName, Opts) ->
 'v_msg_client.ClientPong'(M, Path, _TrUserData) when is_map(M) -> mk_type_error({missing_fields, [] -- maps:keys(M), 'client.ClientPong'}, M, Path);
 'v_msg_client.ClientPong'(X, Path, _TrUserData) -> mk_type_error({expected_msg, 'client.ClientPong'}, X, Path).
 
+-compile({nowarn_unused_function,'v_msg_client.NoTxRead'/3}).
+-dialyzer({nowarn_function,'v_msg_client.NoTxRead'/3}).
+'v_msg_client.NoTxRead'(#{} = M, Path, TrUserData) ->
+    case M of
+        #{key := F1} -> v_type_bytes(F1, [key | Path], TrUserData);
+        _ -> ok
+    end,
+    lists:foreach(fun (key) -> ok;
+                      (OtherKey) -> mk_type_error({extraneous_key, OtherKey}, M, Path)
+                  end,
+                  maps:keys(M)),
+    ok;
+'v_msg_client.NoTxRead'(M, Path, _TrUserData) when is_map(M) -> mk_type_error({missing_fields, [] -- maps:keys(M), 'client.NoTxRead'}, M, Path);
+'v_msg_client.NoTxRead'(X, Path, _TrUserData) -> mk_type_error({expected_msg, 'client.NoTxRead'}, X, Path).
+
+-compile({nowarn_unused_function,'v_msg_client.NoTxReadReply'/3}).
+-dialyzer({nowarn_function,'v_msg_client.NoTxReadReply'/3}).
+'v_msg_client.NoTxReadReply'(#{} = M, Path, TrUserData) ->
+    case M of
+        #{data := F1} -> v_type_bytes(F1, [data | Path], TrUserData);
+        _ -> ok
+    end,
+    lists:foreach(fun (data) -> ok;
+                      (OtherKey) -> mk_type_error({extraneous_key, OtherKey}, M, Path)
+                  end,
+                  maps:keys(M)),
+    ok;
+'v_msg_client.NoTxReadReply'(M, Path, _TrUserData) when is_map(M) -> mk_type_error({missing_fields, [] -- maps:keys(M), 'client.NoTxReadReply'}, M, Path);
+'v_msg_client.NoTxReadReply'(X, Path, _TrUserData) -> mk_type_error({expected_msg, 'client.NoTxReadReply'}, X, Path).
+
 -compile({nowarn_unused_function,'v_msg_client.Request'/3}).
 -dialyzer({nowarn_function,'v_msg_client.Request'/3}).
 'v_msg_client.Request'(#{} = M, Path, TrUserData) ->
@@ -2178,6 +2410,7 @@ verify_msg(Msg, MsgName, Opts) ->
         #{payload := {release, OF2}} -> 'v_msg_client.Release'(OF2, [release, payload | Path], TrUserData);
         #{payload := {load, OF2}} -> 'v_msg_client.Load'(OF2, [load, payload | Path], TrUserData);
         #{payload := {ping, OF2}} -> 'v_msg_client.ClientPing'(OF2, [ping, payload | Path], TrUserData);
+        #{payload := {no_tx_read, OF2}} -> 'v_msg_client.NoTxRead'(OF2, [no_tx_read, payload | Path], TrUserData);
         #{payload := F2} -> mk_type_error(invalid_oneof, F2, [payload | Path]);
         _ -> ok
     end,
@@ -2203,6 +2436,7 @@ verify_msg(Msg, MsgName, Opts) ->
         #{payload := {commit, OF2}} -> 'v_msg_client.CommitReply'(OF2, [commit, payload | Path], TrUserData);
         #{payload := {load, OF2}} -> 'v_msg_client.LoadReply'(OF2, [load, payload | Path], TrUserData);
         #{payload := {pong, OF2}} -> 'v_msg_client.ClientPong'(OF2, [pong, payload | Path], TrUserData);
+        #{payload := {no_tx_read, OF2}} -> 'v_msg_client.NoTxReadReply'(OF2, [no_tx_read, payload | Path], TrUserData);
         #{payload := F2} -> mk_type_error(invalid_oneof, F2, [payload | Path]);
         _ -> ok
     end,

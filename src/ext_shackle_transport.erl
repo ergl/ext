@@ -7,7 +7,8 @@
          commit/3,
          release/3]).
 
--export([ping/2]).
+-export([ping/2,
+         read_request_no_tx/2]).
 
 %% API
 -export([init/1,
@@ -25,6 +26,14 @@
 
 ping(Pool, TxId) ->
     shackle:cast(Pool, {ping, TxId}, self(), infinity).
+
+-spec read_request_no_tx(
+    Pool :: shackle_pool(),
+    Key :: binary())
+    -> {ok, shackle:external_request_id()}.
+%% When awaited, returns {ok, Data :: binary()}.
+read_request_no_tx(Pool, Key) ->
+    shackle:cast(Pool, {read_no_tx, Key}, self(), infinity).
 
 -spec read_request(
     Pool :: shackle_pool(),
@@ -71,6 +80,10 @@ setup(_Socket, State) ->
 handle_request({ping, TxId}, S=#state{req_counter=Req}) ->
     Msg = #{txId => TxId},
     {ok, Req, make_request(Req, {ping, Msg}), incr_req(S)};
+
+handle_request({read_no_tx, Key}, S=#state{req_counter=Req}) ->
+    Msg = #{key => Key},
+    {ok, Req, make_request(Req, {no_tx_read, Msg}), incr_req(S)};
 
 handle_request({read, PrevLeader, TxId, Timestamp, Key}, S=#state{req_counter=Req}) ->
     Msg0 = #{txId => TxId, timestamp => Timestamp, key => Key},
@@ -126,7 +139,8 @@ decode_payload({update, Map}) ->
     end;
 decode_payload({commit, #{commit := true}}) -> ok;
 decode_payload({commit, #{commit := false}}) -> error;
-decode_payload({pong, _}) -> ok.
+decode_payload({pong, _}) -> ok;
+decode_payload({no_tx_read, #{data := Data}}) -> {ok, Data}.
 
 -spec incr_req(state()) -> state().
 incr_req(S=#state{req_counter=ReqC, max_req_id=MaxId}) ->
