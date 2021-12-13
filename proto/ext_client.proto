@@ -61,6 +61,7 @@ message ClientPong {}
 
 message NoTxRead {
   bytes key = 1;
+  optional bytes txId = 2;
 }
 
 message NoTxReadReply {

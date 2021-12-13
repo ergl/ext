@@ -8,7 +8,8 @@
          release/3]).
 
 -export([ping/2,
-         read_request_no_tx/2]).
+         read_request_no_tx/2,
+         read_request_no_tx/3]).
 
 %% API
 -export([init/1,
@@ -34,6 +35,15 @@ ping(Pool, TxId) ->
 %% When awaited, returns {ok, Data :: binary()}.
 read_request_no_tx(Pool, Key) ->
     shackle:cast(Pool, {read_no_tx, Key}, self(), infinity).
+
+-spec read_request_no_tx(
+    Pool :: shackle_pool(),
+    TxId :: binary(),
+    Key :: binary())
+    -> {ok, shackle:external_request_id()}.
+%% When awaited, returns {ok, Data :: binary()}.
+read_request_no_tx(Pool, TxId, Key) ->
+    shackle:cast(Pool, {read_no_tx, TxId, Key}, self(), infinity).
 
 -spec read_request(
     Pool :: shackle_pool(),
@@ -83,6 +93,10 @@ handle_request({ping, TxId}, S=#state{req_counter=Req}) ->
 
 handle_request({read_no_tx, Key}, S=#state{req_counter=Req}) ->
     Msg = #{key => Key},
+    {ok, Req, make_request(Req, {no_tx_read, Msg}), incr_req(S)};
+
+handle_request({read_no_tx, TxId, Key}, S=#state{req_counter=Req}) ->
+    Msg = #{txId => TxId, key => Key},
     {ok, Req, make_request(Req, {no_tx_read, Msg}), incr_req(S)};
 
 handle_request({read, PrevLeader, TxId, Timestamp, Key}, S=#state{req_counter=Req}) ->
