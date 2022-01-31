@@ -1,0 +1,86 @@
+syntax = "proto3";
+package server;
+import "proto/ext_client.proto";
+
+message LocalPing {
+  uint32 partition = 1;
+}
+
+message Ping {
+  bytes replica = 1;
+}
+
+message WriteEntry {
+  bytes key = 1;
+  bytes data = 2;
+}
+
+message Coordinator {
+  string replica = 1;
+  uint32 partition = 2;
+}
+
+message Prepare {
+  Coordinator coord = 1;
+  string txId = 2;
+  map<uint32, uint32> ballots = 3;
+}
+
+message Accept {
+  Coordinator coord = 1;
+  uint32 ballot = 2;
+  string txId = 3;
+  repeated bytes readset = 4;
+  repeated WriteEntry writeset = 5;
+  map<uint32, uint32> ballots = 6;
+  uint64 timestamp = 7;
+}
+
+message AcceptAck {
+  uint32 coordPartition = 1;
+  string txId = 2;
+  uint64 timestamp = 3;
+  // Fill this when forwarding to coordinator
+  optional string fromReplica = 4;
+}
+
+message Decision {
+  // Leave empty when sending to leader
+  optional uint32 ballot = 1;
+  string txId = 2;
+  bool commit = 3;
+  uint64 timestamp = 4;
+}
+
+message AlreadyDecided {
+  uint32 coordPartition = 1;
+  string txId = 2;
+  bool commit = 3;
+  uint64 timestamp = 4;
+  // Fill this when forwarding to coordinator
+  optional string fromReplica = 5;
+}
+
+message Request {
+  oneof payload {
+    // Bookkeeping between local nodes
+    LocalPing localPing = 13;
+
+    // Bookeeping between replicas
+    Ping ping = 1;
+
+    // Forwarded requests
+    client.Read read = 2;
+    client.Update update = 3;
+    client.ReadReply readReply = 4;
+    client.UpdateReply updateReply = 5;
+    client.Release release = 15;
+
+    // Consensus
+    Prepare prepare = 6;
+    Accept accept = 7;
+    AcceptAck acceptAck = 8;
+    Decision decision = 9;
+    AlreadyDecided alreadyDecided = 10;
+  }
+}
