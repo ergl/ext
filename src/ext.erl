@@ -29,12 +29,6 @@
 -export([commit/2,
          release/2]).
 
-%% Non-transactional API
--export([async_read_no_tx/2,
-         await_read_no_tx/2,
-         sync_read_no_tx/2,
-         sync_read_no_tx/3]).
-
 -record(coordinator, {
     %% The IP we're using to talk to the server
     %% Used to create a transaction id
@@ -226,50 +220,6 @@ ping(#coordinator{ring=Ring, conn_pool=Pools},
     Pool = maps:get(Node, Pools),
     {ok, ReqId} = ext_shackle_transport:ping(Pool, TxId),
     shackle:receive_response(ReqId).
-
-%%====================================================================
-%% Non-transactional interface
-%%====================================================================
-
--spec async_read_no_tx(t(), binary()) -> {ok, no_tx_read_req_id()}.
-async_read_no_tx(#coordinator{ring=Ring, conn_pool=Pools}, Key) ->
-    {_, Node} = ext_ring:get_key_location(Ring, Key),
-    Pool = maps:get(Node, Pools),
-    {ok, ReqId} = ext_shackle_transport:read_request_no_tx(Pool, Key),
-    {ok, {read, ReqId}}.
-
--spec await_read_no_tx(t(), no_tx_read_req_id()) -> {ok, binary()}.
-await_read_no_tx(_, {read, ReqId}) ->
-    shackle:receive_response(ReqId).
-
--spec sync_read_no_tx(t(), binary()) -> {ok, binary()}.
-sync_read_no_tx(Coord, Key) ->
-    {ok, Req} = async_read_no_tx(Coord, Key),
-    await_read_no_tx(Coord, Req).
-
--spec async_read_no_tx(t(), tx(), binary()) -> {ok, read_req_id()}.
-async_read_no_tx(#coordinator{ring=Ring, conn_pool=Pools},
-                 #transaction{id=TxId},
-                 Key) ->
-    Idx={_, Node} = ext_ring:get_key_location(Ring, Key),
-    Pool = maps:get(Node, Pools),
-    {ok, ReqId} = ext_shackle_transport:read_request_no_tx(Pool, TxId, Key),
-    {ok, {read, ReqId, Idx}}.
-
--spec await_read_no_tx(t(), tx(), read_req_id()) -> {ok, binary(), tx()}.
-await_read_no_tx(_, Tx, {read, ReqId, {_, Node}}) ->
-    case shackle:receive_response(ReqId) of
-        error ->
-            error;
-
-        {ok, Value} ->
-            {ok, Value, set_tx_init_node(Tx, Node)}
-    end.
-
--spec sync_read_no_tx(t(), tx(), binary()) -> {ok, binary(), tx()}.
-sync_read_no_tx(Coord, Tx, Key) ->
-    {ok, Req} = async_read_no_tx(Coord, Tx, Key),
-    await_read_no_tx(Coord, Tx, Req).
 
 %%====================================================================
 %% Internal functions
