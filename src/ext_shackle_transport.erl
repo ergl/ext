@@ -106,10 +106,10 @@ terminate(_State) -> ok.
 
 -spec make_request(non_neg_integer(), #{}) -> binary().
 make_request(Req, Payload) ->
-    ext_client_proto:encode_msg(#{seq => Req, payload => Payload}, 'client.Request').
+    ?FRAME_SEQ(ext_client_proto:encode_msg(#{seq => Req, payload => Payload}, 'client.Request')).
 
 -spec decode_reply(binary()) -> {non_neg_integer(), term()}.
-decode_reply(Payload) ->
+decode_reply(?WITH_FRAME(Payload)) ->
     #{seq := Seq, payload := InnerPayload} = ext_client_proto:decode_msg(Payload, 'client.Response'),
     {Seq, decode_payload(InnerPayload)}.
 
