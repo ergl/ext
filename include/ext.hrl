@@ -7,12 +7,6 @@
 -type node_and_port() :: {node_ip(), inet:port_number()}.
 -type index_node() :: {partition_id(), node_and_port()}.
 
--define(FRAME_SEQ(Bin),
-    <<0:8/unit:8-integer-big-unsigned, (Bin)/binary>>).
-
--define(WITH_FRAME(Bin),
-    <<_:8/unit:8-integer-big-unsigned, Bin/binary>>).
-
 -export_type([node_ip/0,
               node_and_port/0,
               partition_id/0,
