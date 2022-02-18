@@ -60,7 +60,8 @@
 
 -type 'client.Commit'() ::
       #{txId                    => unicode:chardata(), % = 1, optional
-        ballots                 => #{non_neg_integer() => non_neg_integer()} % = 2
+        ballots                 => #{non_neg_integer() => non_neg_integer()}, % = 2
+        timestamp               => non_neg_integer() % = 3, optional, 64 bits
        }.
 
 -type 'client.CommitReply'() ::
@@ -365,13 +366,23 @@ encode_msg(Msg, MsgName, Opts) ->
                  end;
              _ -> Bin
          end,
+    B2 = case M of
+             #{ballots := F2} ->
+                 TrF2 = 'tr_encode_client.Commit.ballots'(F2, TrUserData),
+                 if TrF2 == [] -> B1;
+                    true -> 'e_field_client.Commit_ballots'(TrF2, B1, TrUserData)
+                 end;
+             _ -> B1
+         end,
     case M of
-        #{ballots := F2} ->
-            TrF2 = 'tr_encode_client.Commit.ballots'(F2, TrUserData),
-            if TrF2 == [] -> B1;
-               true -> 'e_field_client.Commit_ballots'(TrF2, B1, TrUserData)
+        #{timestamp := F3} ->
+            begin
+                TrF3 = id(F3, TrUserData),
+                if TrF3 =:= 0 -> B2;
+                   true -> e_varint(TrF3, <<B2/binary, 24>>, TrUserData)
+                end
             end;
-        _ -> B1
+        _ -> B2
     end.
 
 'encode_msg_client.CommitReply'(Msg, TrUserData) -> 'encode_msg_client.CommitReply'(Msg, <<>>, TrUserData).
@@ -1103,56 +1114,63 @@ decode_msg_2_doit('client.Response', Bin, TrUserData) -> id('decode_msg_client.R
 
 'skip_64_client.UpdateReply'(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, TrUserData) -> 'dfp_read_field_def_client.UpdateReply'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, TrUserData).
 
-'decode_msg_client.Commit'(Bin, TrUserData) -> 'dfp_read_field_def_client.Commit'(Bin, 0, 0, 0, id(<<>>, TrUserData), 'tr_decode_init_default_client.Commit.ballots'([], TrUserData), TrUserData).
+'decode_msg_client.Commit'(Bin, TrUserData) -> 'dfp_read_field_def_client.Commit'(Bin, 0, 0, 0, id(<<>>, TrUserData), 'tr_decode_init_default_client.Commit.ballots'([], TrUserData), id(0, TrUserData), TrUserData).
 
-'dfp_read_field_def_client.Commit'(<<10, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.Commit_txId'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
-'dfp_read_field_def_client.Commit'(<<18, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.Commit_ballots'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
-'dfp_read_field_def_client.Commit'(<<>>, 0, 0, _, F@_1, R1, TrUserData) -> #{txId => F@_1, ballots => 'tr_decode_repeated_finalize_client.Commit.ballots'(R1, TrUserData)};
-'dfp_read_field_def_client.Commit'(Other, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dg_read_field_def_client.Commit'(Other, Z1, Z2, F, F@_1, F@_2, TrUserData).
+'dfp_read_field_def_client.Commit'(<<10, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> 'd_field_client.Commit_txId'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData);
+'dfp_read_field_def_client.Commit'(<<18, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> 'd_field_client.Commit_ballots'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData);
+'dfp_read_field_def_client.Commit'(<<24, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> 'd_field_client.Commit_timestamp'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData);
+'dfp_read_field_def_client.Commit'(<<>>, 0, 0, _, F@_1, R1, F@_3, TrUserData) -> #{txId => F@_1, ballots => 'tr_decode_repeated_finalize_client.Commit.ballots'(R1, TrUserData), timestamp => F@_3};
+'dfp_read_field_def_client.Commit'(Other, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> 'dg_read_field_def_client.Commit'(Other, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData).
 
-'dg_read_field_def_client.Commit'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 32 - 7 -> 'dg_read_field_def_client.Commit'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
-'dg_read_field_def_client.Commit'(<<0:1, X:7, Rest/binary>>, N, Acc, _, F@_1, F@_2, TrUserData) ->
+'dg_read_field_def_client.Commit'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 32 - 7 -> 'dg_read_field_def_client.Commit'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+'dg_read_field_def_client.Commit'(<<0:1, X:7, Rest/binary>>, N, Acc, _, F@_1, F@_2, F@_3, TrUserData) ->
     Key = X bsl N + Acc,
     case Key of
-        10 -> 'd_field_client.Commit_txId'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
-        18 -> 'd_field_client.Commit_ballots'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
+        10 -> 'd_field_client.Commit_txId'(Rest, 0, 0, 0, F@_1, F@_2, F@_3, TrUserData);
+        18 -> 'd_field_client.Commit_ballots'(Rest, 0, 0, 0, F@_1, F@_2, F@_3, TrUserData);
+        24 -> 'd_field_client.Commit_timestamp'(Rest, 0, 0, 0, F@_1, F@_2, F@_3, TrUserData);
         _ ->
             case Key band 7 of
-                0 -> 'skip_varint_client.Commit'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
-                1 -> 'skip_64_client.Commit'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
-                2 -> 'skip_length_delimited_client.Commit'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
-                3 -> 'skip_group_client.Commit'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
-                5 -> 'skip_32_client.Commit'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData)
+                0 -> 'skip_varint_client.Commit'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData);
+                1 -> 'skip_64_client.Commit'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData);
+                2 -> 'skip_length_delimited_client.Commit'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData);
+                3 -> 'skip_group_client.Commit'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData);
+                5 -> 'skip_32_client.Commit'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData)
             end
     end;
-'dg_read_field_def_client.Commit'(<<>>, 0, 0, _, F@_1, R1, TrUserData) -> #{txId => F@_1, ballots => 'tr_decode_repeated_finalize_client.Commit.ballots'(R1, TrUserData)}.
+'dg_read_field_def_client.Commit'(<<>>, 0, 0, _, F@_1, R1, F@_3, TrUserData) -> #{txId => F@_1, ballots => 'tr_decode_repeated_finalize_client.Commit.ballots'(R1, TrUserData), timestamp => F@_3}.
 
-'d_field_client.Commit_txId'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'd_field_client.Commit_txId'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
-'d_field_client.Commit_txId'(<<0:1, X:7, Rest/binary>>, N, Acc, F, _, F@_2, TrUserData) ->
+'d_field_client.Commit_txId'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 57 -> 'd_field_client.Commit_txId'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+'d_field_client.Commit_txId'(<<0:1, X:7, Rest/binary>>, N, Acc, F, _, F@_2, F@_3, TrUserData) ->
     {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bytes:Len/binary, Rest2/binary>> = Rest, Bytes2 = binary:copy(Bytes), {id(Bytes2, TrUserData), Rest2} end,
-    'dfp_read_field_def_client.Commit'(RestF, 0, 0, F, NewFValue, F@_2, TrUserData).
+    'dfp_read_field_def_client.Commit'(RestF, 0, 0, F, NewFValue, F@_2, F@_3, TrUserData).
 
-'d_field_client.Commit_ballots'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'd_field_client.Commit_ballots'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
-'d_field_client.Commit_ballots'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, Prev, TrUserData) ->
+'d_field_client.Commit_ballots'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 57 -> 'd_field_client.Commit_ballots'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+'d_field_client.Commit_ballots'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, Prev, F@_3, TrUserData) ->
     {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bs:Len/binary, Rest2/binary>> = Rest, {id('decode_msg_map<uint32,uint32>'(Bs, TrUserData), TrUserData), Rest2} end,
-    'dfp_read_field_def_client.Commit'(RestF, 0, 0, F, F@_1, 'tr_decode_repeated_add_elem_client.Commit.ballots'(NewFValue, Prev, TrUserData), TrUserData).
+    'dfp_read_field_def_client.Commit'(RestF, 0, 0, F, F@_1, 'tr_decode_repeated_add_elem_client.Commit.ballots'(NewFValue, Prev, TrUserData), F@_3, TrUserData).
 
-'skip_varint_client.Commit'(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'skip_varint_client.Commit'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
-'skip_varint_client.Commit'(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_client.Commit'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+'d_field_client.Commit_timestamp'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 57 -> 'd_field_client.Commit_timestamp'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+'d_field_client.Commit_timestamp'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, _, TrUserData) ->
+    {NewFValue, RestF} = {id((X bsl N + Acc) band 18446744073709551615, TrUserData), Rest},
+    'dfp_read_field_def_client.Commit'(RestF, 0, 0, F, F@_1, F@_2, NewFValue, TrUserData).
 
-'skip_length_delimited_client.Commit'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'skip_length_delimited_client.Commit'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
-'skip_length_delimited_client.Commit'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) ->
+'skip_varint_client.Commit'(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> 'skip_varint_client.Commit'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData);
+'skip_varint_client.Commit'(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> 'dfp_read_field_def_client.Commit'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData).
+
+'skip_length_delimited_client.Commit'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 57 -> 'skip_length_delimited_client.Commit'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+'skip_length_delimited_client.Commit'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) ->
     Length = X bsl N + Acc,
     <<_:Length/binary, Rest2/binary>> = Rest,
-    'dfp_read_field_def_client.Commit'(Rest2, 0, 0, F, F@_1, F@_2, TrUserData).
+    'dfp_read_field_def_client.Commit'(Rest2, 0, 0, F, F@_1, F@_2, F@_3, TrUserData).
 
-'skip_group_client.Commit'(Bin, _, Z2, FNum, F@_1, F@_2, TrUserData) ->
+'skip_group_client.Commit'(Bin, _, Z2, FNum, F@_1, F@_2, F@_3, TrUserData) ->
     {_, Rest} = read_group(Bin, FNum),
-    'dfp_read_field_def_client.Commit'(Rest, 0, Z2, FNum, F@_1, F@_2, TrUserData).
+    'dfp_read_field_def_client.Commit'(Rest, 0, Z2, FNum, F@_1, F@_2, F@_3, TrUserData).
 
-'skip_32_client.Commit'(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_client.Commit'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+'skip_32_client.Commit'(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> 'dfp_read_field_def_client.Commit'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData).
 
-'skip_64_client.Commit'(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_client.Commit'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+'skip_64_client.Commit'(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> 'dfp_read_field_def_client.Commit'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData).
 
 'decode_msg_client.CommitReply'(Bin, TrUserData) -> 'dfp_read_field_def_client.CommitReply'(Bin, 0, 0, 0, id(false, TrUserData), TrUserData).
 
@@ -1883,11 +1901,16 @@ merge_msgs(Prev, New, MsgName, Opts) ->
              {#{txId := PFtxId}, _} -> S1#{txId => PFtxId};
              _ -> S1
          end,
+    S3 = case {PMsg, NMsg} of
+             {#{ballots := PFballots}, #{ballots := NFballots}} -> S2#{ballots => 'tr_merge_client.Commit.ballots'(PFballots, NFballots, TrUserData)};
+             {_, #{ballots := NFballots}} -> S2#{ballots => NFballots};
+             {#{ballots := PFballots}, _} -> S2#{ballots => PFballots};
+             {_, _} -> S2
+         end,
     case {PMsg, NMsg} of
-        {#{ballots := PFballots}, #{ballots := NFballots}} -> S2#{ballots => 'tr_merge_client.Commit.ballots'(PFballots, NFballots, TrUserData)};
-        {_, #{ballots := NFballots}} -> S2#{ballots => NFballots};
-        {#{ballots := PFballots}, _} -> S2#{ballots => PFballots};
-        {_, _} -> S2
+        {_, #{timestamp := NFtimestamp}} -> S3#{timestamp => NFtimestamp};
+        {#{timestamp := PFtimestamp}, _} -> S3#{timestamp => PFtimestamp};
+        _ -> S3
     end.
 
 -compile({nowarn_unused_function,'merge_msg_client.CommitReply'/3}).
@@ -2161,8 +2184,13 @@ verify_msg(Msg, MsgName, Opts) ->
         #{ballots := F2} -> 'v_map<uint32,uint32>'(F2, [ballots | Path], TrUserData);
         _ -> ok
     end,
+    case M of
+        #{timestamp := F3} -> v_type_uint64(F3, [timestamp | Path], TrUserData);
+        _ -> ok
+    end,
     lists:foreach(fun (txId) -> ok;
                       (ballots) -> ok;
+                      (timestamp) -> ok;
                       (OtherKey) -> mk_type_error({extraneous_key, OtherKey}, M, Path)
                   end,
                   maps:keys(M)),

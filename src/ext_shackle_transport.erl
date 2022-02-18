@@ -4,7 +4,7 @@
 
 -export([read_request/5,
          update_request/6,
-         commit/3,
+         commit/4,
          release/3]).
 
 -export([ping/2]).
@@ -49,9 +49,9 @@ read_request(Pool, PrevLeader, TxId, Timestamp, Key) ->
 update_request(Pool, PrevLeader, TxId, Timestamp, Key, Value) ->
     shackle:cast(Pool, {update, PrevLeader, TxId, Timestamp, Key, Value}, self(), infinity).
 
--spec commit(shackle_pool(), binary(), #{partition_id() => ballot()}) -> ok | error.
-commit(Pool, TxId, Ballots) ->
-    shackle:call(Pool, {commit, TxId, Ballots}, infinity).
+-spec commit(shackle_pool(), binary(), timestamp(), #{partition_id() => ballot()}) -> ok | error.
+commit(Pool, TxId, Timestamp, Ballots) ->
+    shackle:call(Pool, {commit, TxId, Timestamp, Ballots}, infinity).
 
 -spec release(shackle_pool(), binary(), replica_id()) -> ok.
 release(Pool, TxId, PrevLeader) ->
@@ -82,8 +82,8 @@ handle_request({update, PrevLeader, TxId, Timestamp, Key, Value}, S=#state{req_c
     Msg = case PrevLeader of empty -> Msg0; _ -> Msg0#{prevLeader => PrevLeader} end,
     {ok, Req, make_request(Req, {update, Msg}), incr_req(S)};
 
-handle_request({commit, TxId, Ballots}, S=#state{req_counter=Req}) ->
-    Msg = #{txId => TxId, ballots => Ballots},
+handle_request({commit, TxId, Timestamp, Ballots}, S=#state{req_counter=Req}) ->
+    Msg = #{txId => TxId, timestamp => Timestamp, ballots => Ballots},
     {ok, Req, make_request(Req, {commit, Msg}), incr_req(S)};
 
 handle_request({release, TxId, PrevLeader}, S=#state{req_counter=Req}) ->

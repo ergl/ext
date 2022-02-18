@@ -46,6 +46,7 @@ message UpdateReply {
 message Commit {
   string txId = 1;
   map<uint32, uint32> ballots = 2;
+  uint64 timestamp = 3;
 }
 
 message CommitReply {

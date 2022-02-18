@@ -141,9 +141,9 @@ start_transaction(#coordinator{tx_id_prefix=Prefix}, Id) ->
 commit(_, #transaction{init_node=undefined}) ->
     %% If the transaction never read anything, we bypass 2PC
     ok;
-commit(#coordinator{conn_pool=Pools}, #transaction{id=TxId, init_node=Idx, ballots=Ballots}) ->
+commit(#coordinator{conn_pool=Pools}, #transaction{id=TxId, init_node=Idx, timestamp=Ts, ballots=Ballots}) ->
     Pool = maps:get(Idx, Pools),
-    ext_shackle_transport:commit(Pool, TxId, Ballots).
+    ext_shackle_transport:commit(Pool, TxId, Ts, Ballots).
 
 -spec release(t(), tx()) -> ok.
 release(_, #transaction{init_node=undefined}) ->
