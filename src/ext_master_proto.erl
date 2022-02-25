@@ -32,11 +32,17 @@
         remotePort              => non_neg_integer() % = 4, optional, 32 bits
        }.
 
+-type 'master.SiblingLatency'() ::
+      #{addr                    => 'master.Address'(), % = 1, optional
+        latency                 => non_neg_integer() % = 2, optional, 32 bits
+       }.
+
 -type 'master.RegisterReply'() ::
       #{partition               => non_neg_integer(), % = 1, optional, 32 bits
         leader                  => 'master.Address'(), % = 2, optional
-        siblings                => ['master.Address'()], % = 3, repeated
-        localNodes              => ['master.Address'()] % = 4, repeated
+        siblings                => ['master.SiblingLatency'()], % = 3, repeated
+        localNodes              => ['master.Address'()], % = 4, repeated
+        leaderChoices           => [unicode:chardata()] % = 5, repeated
        }.
 
 -type 'master.GetNodesReply'() ::
@@ -53,9 +59,9 @@
         payload                 => {registerReply, 'master.RegisterReply'()} | {getPartitionLeaderReply, 'master.Address'()} | {getReplicaNodesReply, 'master.GetNodesReply'()} % oneof
        }.
 
--export_type(['master.Address'/0, 'master.Register'/0, 'master.RegisterReply'/0, 'master.GetNodesReply'/0, 'master.Request'/0, 'master.Response'/0]).
--type '$msg_name'() :: 'master.Address' | 'master.Register' | 'master.RegisterReply' | 'master.GetNodesReply' | 'master.Request' | 'master.Response'.
--type '$msg'() :: 'master.Address'() | 'master.Register'() | 'master.RegisterReply'() | 'master.GetNodesReply'() | 'master.Request'() | 'master.Response'().
+-export_type(['master.Address'/0, 'master.Register'/0, 'master.SiblingLatency'/0, 'master.RegisterReply'/0, 'master.GetNodesReply'/0, 'master.Request'/0, 'master.Response'/0]).
+-type '$msg_name'() :: 'master.Address' | 'master.Register' | 'master.SiblingLatency' | 'master.RegisterReply' | 'master.GetNodesReply' | 'master.Request' | 'master.Response'.
+-type '$msg'() :: 'master.Address'() | 'master.Register'() | 'master.SiblingLatency'() | 'master.RegisterReply'() | 'master.GetNodesReply'() | 'master.Request'() | 'master.Response'().
 -export_type(['$msg_name'/0, '$msg'/0]).
 
 -if(?OTP_RELEASE >= 24).
@@ -77,6 +83,7 @@ encode_msg(Msg, MsgName, Opts) ->
     case MsgName of
         'master.Address' -> 'encode_msg_master.Address'(id(Msg, TrUserData), TrUserData);
         'master.Register' -> 'encode_msg_master.Register'(id(Msg, TrUserData), TrUserData);
+        'master.SiblingLatency' -> 'encode_msg_master.SiblingLatency'(id(Msg, TrUserData), TrUserData);
         'master.RegisterReply' -> 'encode_msg_master.RegisterReply'(id(Msg, TrUserData), TrUserData);
         'master.GetNodesReply' -> 'encode_msg_master.GetNodesReply'(id(Msg, TrUserData), TrUserData);
         'master.Request' -> 'encode_msg_master.Request'(id(Msg, TrUserData), TrUserData);
@@ -178,6 +185,31 @@ encode_msg(Msg, MsgName, Opts) ->
         _ -> B3
     end.
 
+'encode_msg_master.SiblingLatency'(Msg, TrUserData) -> 'encode_msg_master.SiblingLatency'(Msg, <<>>, TrUserData).
+
+
+'encode_msg_master.SiblingLatency'(#{} = M, Bin, TrUserData) ->
+    B1 = case M of
+             #{addr := F1} ->
+                 begin
+                     TrF1 = id(F1, TrUserData),
+                     if TrF1 =:= undefined -> Bin;
+                        true -> 'e_mfield_master.SiblingLatency_addr'(TrF1, <<Bin/binary, 10>>, TrUserData)
+                     end
+                 end;
+             _ -> Bin
+         end,
+    case M of
+        #{latency := F2} ->
+            begin
+                TrF2 = id(F2, TrUserData),
+                if TrF2 =:= 0 -> B1;
+                   true -> e_varint(TrF2, <<B1/binary, 16>>, TrUserData)
+                end
+            end;
+        _ -> B1
+    end.
+
 'encode_msg_master.RegisterReply'(Msg, TrUserData) -> 'encode_msg_master.RegisterReply'(Msg, <<>>, TrUserData).
 
 
@@ -210,13 +242,21 @@ encode_msg(Msg, MsgName, Opts) ->
                  end;
              _ -> B2
          end,
+    B4 = case M of
+             #{localNodes := F4} ->
+                 TrF4 = id(F4, TrUserData),
+                 if TrF4 == [] -> B3;
+                    true -> 'e_field_master.RegisterReply_localNodes'(TrF4, B3, TrUserData)
+                 end;
+             _ -> B3
+         end,
     case M of
-        #{localNodes := F4} ->
-            TrF4 = id(F4, TrUserData),
-            if TrF4 == [] -> B3;
-               true -> 'e_field_master.RegisterReply_localNodes'(TrF4, B3, TrUserData)
+        #{leaderChoices := F5} ->
+            TrF5 = id(F5, TrUserData),
+            if TrF5 == [] -> B4;
+               true -> 'e_field_master.RegisterReply_leaderChoices'(TrF5, B4, TrUserData)
             end;
-        _ -> B3
+        _ -> B4
     end.
 
 'encode_msg_master.GetNodesReply'(Msg, TrUserData) -> 'encode_msg_master.GetNodesReply'(Msg, <<>>, TrUserData).
@@ -280,13 +320,18 @@ encode_msg(Msg, MsgName, Opts) ->
         _ -> B1
     end.
 
+'e_mfield_master.SiblingLatency_addr'(Msg, Bin, TrUserData) ->
+    SubBin = 'encode_msg_master.Address'(Msg, <<>>, TrUserData),
+    Bin2 = e_varint(byte_size(SubBin), Bin),
+    <<Bin2/binary, SubBin/binary>>.
+
 'e_mfield_master.RegisterReply_leader'(Msg, Bin, TrUserData) ->
     SubBin = 'encode_msg_master.Address'(Msg, <<>>, TrUserData),
     Bin2 = e_varint(byte_size(SubBin), Bin),
     <<Bin2/binary, SubBin/binary>>.
 
 'e_mfield_master.RegisterReply_siblings'(Msg, Bin, TrUserData) ->
-    SubBin = 'encode_msg_master.Address'(Msg, <<>>, TrUserData),
+    SubBin = 'encode_msg_master.SiblingLatency'(Msg, <<>>, TrUserData),
     Bin2 = e_varint(byte_size(SubBin), Bin),
     <<Bin2/binary, SubBin/binary>>.
 
@@ -306,6 +351,12 @@ encode_msg(Msg, MsgName, Opts) ->
     Bin3 = 'e_mfield_master.RegisterReply_localNodes'(id(Elem, TrUserData), Bin2, TrUserData),
     'e_field_master.RegisterReply_localNodes'(Rest, Bin3, TrUserData);
 'e_field_master.RegisterReply_localNodes'([], Bin, _TrUserData) -> Bin.
+
+'e_field_master.RegisterReply_leaderChoices'([Elem | Rest], Bin, TrUserData) ->
+    Bin2 = <<Bin/binary, 42>>,
+    Bin3 = e_type_string(id(Elem, TrUserData), Bin2, TrUserData),
+    'e_field_master.RegisterReply_leaderChoices'(Rest, Bin3, TrUserData);
+'e_field_master.RegisterReply_leaderChoices'([], Bin, _TrUserData) -> Bin.
 
 'e_mfield_master.GetNodesReply_nodes'(Msg, Bin, TrUserData) ->
     SubBin = 'encode_msg_master.Address'(Msg, <<>>, TrUserData),
@@ -478,6 +529,7 @@ decode_msg_1_catch(Bin, MsgName, TrUserData) ->
 
 decode_msg_2_doit('master.Address', Bin, TrUserData) -> id('decode_msg_master.Address'(Bin, TrUserData), TrUserData);
 decode_msg_2_doit('master.Register', Bin, TrUserData) -> id('decode_msg_master.Register'(Bin, TrUserData), TrUserData);
+decode_msg_2_doit('master.SiblingLatency', Bin, TrUserData) -> id('decode_msg_master.SiblingLatency'(Bin, TrUserData), TrUserData);
 decode_msg_2_doit('master.RegisterReply', Bin, TrUserData) -> id('decode_msg_master.RegisterReply'(Bin, TrUserData), TrUserData);
 decode_msg_2_doit('master.GetNodesReply', Bin, TrUserData) -> id('decode_msg_master.GetNodesReply'(Bin, TrUserData), TrUserData);
 decode_msg_2_doit('master.Request', Bin, TrUserData) -> id('decode_msg_master.Request'(Bin, TrUserData), TrUserData);
@@ -615,14 +667,82 @@ decode_msg_2_doit('master.Response', Bin, TrUserData) -> id('decode_msg_master.R
 
 'skip_64_master.Register'(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, TrUserData) -> 'dfp_read_field_def_master.Register'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, TrUserData).
 
-'decode_msg_master.RegisterReply'(Bin, TrUserData) -> 'dfp_read_field_def_master.RegisterReply'(Bin, 0, 0, 0, id(0, TrUserData), id('$undef', TrUserData), id([], TrUserData), id([], TrUserData), TrUserData).
+'decode_msg_master.SiblingLatency'(Bin, TrUserData) -> 'dfp_read_field_def_master.SiblingLatency'(Bin, 0, 0, 0, id('$undef', TrUserData), id(0, TrUserData), TrUserData).
 
-'dfp_read_field_def_master.RegisterReply'(<<8, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, TrUserData) -> 'd_field_master.RegisterReply_partition'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, TrUserData);
-'dfp_read_field_def_master.RegisterReply'(<<18, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, TrUserData) -> 'd_field_master.RegisterReply_leader'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, TrUserData);
-'dfp_read_field_def_master.RegisterReply'(<<26, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, TrUserData) -> 'd_field_master.RegisterReply_siblings'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, TrUserData);
-'dfp_read_field_def_master.RegisterReply'(<<34, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, TrUserData) -> 'd_field_master.RegisterReply_localNodes'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, TrUserData);
-'dfp_read_field_def_master.RegisterReply'(<<>>, 0, 0, _, F@_1, F@_2, R1, R2, TrUserData) ->
-    S1 = #{partition => F@_1},
+'dfp_read_field_def_master.SiblingLatency'(<<10, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_master.SiblingLatency_addr'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+'dfp_read_field_def_master.SiblingLatency'(<<16, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_master.SiblingLatency_latency'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+'dfp_read_field_def_master.SiblingLatency'(<<>>, 0, 0, _, F@_1, F@_2, _) ->
+    S1 = #{latency => F@_2},
+    if F@_1 == '$undef' -> S1;
+       true -> S1#{addr => F@_1}
+    end;
+'dfp_read_field_def_master.SiblingLatency'(Other, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dg_read_field_def_master.SiblingLatency'(Other, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+'dg_read_field_def_master.SiblingLatency'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 32 - 7 -> 'dg_read_field_def_master.SiblingLatency'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'dg_read_field_def_master.SiblingLatency'(<<0:1, X:7, Rest/binary>>, N, Acc, _, F@_1, F@_2, TrUserData) ->
+    Key = X bsl N + Acc,
+    case Key of
+        10 -> 'd_field_master.SiblingLatency_addr'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
+        16 -> 'd_field_master.SiblingLatency_latency'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
+        _ ->
+            case Key band 7 of
+                0 -> 'skip_varint_master.SiblingLatency'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                1 -> 'skip_64_master.SiblingLatency'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                2 -> 'skip_length_delimited_master.SiblingLatency'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                3 -> 'skip_group_master.SiblingLatency'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                5 -> 'skip_32_master.SiblingLatency'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData)
+            end
+    end;
+'dg_read_field_def_master.SiblingLatency'(<<>>, 0, 0, _, F@_1, F@_2, _) ->
+    S1 = #{latency => F@_2},
+    if F@_1 == '$undef' -> S1;
+       true -> S1#{addr => F@_1}
+    end.
+
+'d_field_master.SiblingLatency_addr'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'd_field_master.SiblingLatency_addr'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'d_field_master.SiblingLatency_addr'(<<0:1, X:7, Rest/binary>>, N, Acc, F, Prev, F@_2, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bs:Len/binary, Rest2/binary>> = Rest, {id('decode_msg_master.Address'(Bs, TrUserData), TrUserData), Rest2} end,
+    'dfp_read_field_def_master.SiblingLatency'(RestF,
+                                               0,
+                                               0,
+                                               F,
+                                               if Prev == '$undef' -> NewFValue;
+                                                  true -> 'merge_msg_master.Address'(Prev, NewFValue, TrUserData)
+                                               end,
+                                               F@_2,
+                                               TrUserData).
+
+'d_field_master.SiblingLatency_latency'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'd_field_master.SiblingLatency_latency'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'d_field_master.SiblingLatency_latency'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, _, TrUserData) ->
+    {NewFValue, RestF} = {id((X bsl N + Acc) band 4294967295, TrUserData), Rest},
+    'dfp_read_field_def_master.SiblingLatency'(RestF, 0, 0, F, F@_1, NewFValue, TrUserData).
+
+'skip_varint_master.SiblingLatency'(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'skip_varint_master.SiblingLatency'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+'skip_varint_master.SiblingLatency'(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_master.SiblingLatency'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+'skip_length_delimited_master.SiblingLatency'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'skip_length_delimited_master.SiblingLatency'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'skip_length_delimited_master.SiblingLatency'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) ->
+    Length = X bsl N + Acc,
+    <<_:Length/binary, Rest2/binary>> = Rest,
+    'dfp_read_field_def_master.SiblingLatency'(Rest2, 0, 0, F, F@_1, F@_2, TrUserData).
+
+'skip_group_master.SiblingLatency'(Bin, _, Z2, FNum, F@_1, F@_2, TrUserData) ->
+    {_, Rest} = read_group(Bin, FNum),
+    'dfp_read_field_def_master.SiblingLatency'(Rest, 0, Z2, FNum, F@_1, F@_2, TrUserData).
+
+'skip_32_master.SiblingLatency'(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_master.SiblingLatency'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+'skip_64_master.SiblingLatency'(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_master.SiblingLatency'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+'decode_msg_master.RegisterReply'(Bin, TrUserData) -> 'dfp_read_field_def_master.RegisterReply'(Bin, 0, 0, 0, id(0, TrUserData), id('$undef', TrUserData), id([], TrUserData), id([], TrUserData), id([], TrUserData), TrUserData).
+
+'dfp_read_field_def_master.RegisterReply'(<<8, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> 'd_field_master.RegisterReply_partition'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+'dfp_read_field_def_master.RegisterReply'(<<18, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> 'd_field_master.RegisterReply_leader'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+'dfp_read_field_def_master.RegisterReply'(<<26, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> 'd_field_master.RegisterReply_siblings'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+'dfp_read_field_def_master.RegisterReply'(<<34, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> 'd_field_master.RegisterReply_localNodes'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+'dfp_read_field_def_master.RegisterReply'(<<42, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> 'd_field_master.RegisterReply_leaderChoices'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+'dfp_read_field_def_master.RegisterReply'(<<>>, 0, 0, _, F@_1, F@_2, R1, R2, R3, TrUserData) ->
+    S1 = #{partition => F@_1, leaderChoices => lists_reverse(R3, TrUserData)},
     S2 = if F@_2 == '$undef' -> S1;
             true -> S1#{leader => F@_2}
          end,
@@ -632,27 +752,29 @@ decode_msg_2_doit('master.Response', Bin, TrUserData) -> id('decode_msg_master.R
     if R2 == '$undef' -> S3;
        true -> S3#{localNodes => lists_reverse(R2, TrUserData)}
     end;
-'dfp_read_field_def_master.RegisterReply'(Other, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, TrUserData) -> 'dg_read_field_def_master.RegisterReply'(Other, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, TrUserData).
+'dfp_read_field_def_master.RegisterReply'(Other, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> 'dg_read_field_def_master.RegisterReply'(Other, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData).
 
-'dg_read_field_def_master.RegisterReply'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, TrUserData) when N < 32 - 7 -> 'dg_read_field_def_master.RegisterReply'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, TrUserData);
-'dg_read_field_def_master.RegisterReply'(<<0:1, X:7, Rest/binary>>, N, Acc, _, F@_1, F@_2, F@_3, F@_4, TrUserData) ->
+'dg_read_field_def_master.RegisterReply'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 32 - 7 ->
+    'dg_read_field_def_master.RegisterReply'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+'dg_read_field_def_master.RegisterReply'(<<0:1, X:7, Rest/binary>>, N, Acc, _, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) ->
     Key = X bsl N + Acc,
     case Key of
-        8 -> 'd_field_master.RegisterReply_partition'(Rest, 0, 0, 0, F@_1, F@_2, F@_3, F@_4, TrUserData);
-        18 -> 'd_field_master.RegisterReply_leader'(Rest, 0, 0, 0, F@_1, F@_2, F@_3, F@_4, TrUserData);
-        26 -> 'd_field_master.RegisterReply_siblings'(Rest, 0, 0, 0, F@_1, F@_2, F@_3, F@_4, TrUserData);
-        34 -> 'd_field_master.RegisterReply_localNodes'(Rest, 0, 0, 0, F@_1, F@_2, F@_3, F@_4, TrUserData);
+        8 -> 'd_field_master.RegisterReply_partition'(Rest, 0, 0, 0, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+        18 -> 'd_field_master.RegisterReply_leader'(Rest, 0, 0, 0, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+        26 -> 'd_field_master.RegisterReply_siblings'(Rest, 0, 0, 0, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+        34 -> 'd_field_master.RegisterReply_localNodes'(Rest, 0, 0, 0, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+        42 -> 'd_field_master.RegisterReply_leaderChoices'(Rest, 0, 0, 0, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
         _ ->
             case Key band 7 of
-                0 -> 'skip_varint_master.RegisterReply'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, F@_4, TrUserData);
-                1 -> 'skip_64_master.RegisterReply'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, F@_4, TrUserData);
-                2 -> 'skip_length_delimited_master.RegisterReply'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, F@_4, TrUserData);
-                3 -> 'skip_group_master.RegisterReply'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, F@_4, TrUserData);
-                5 -> 'skip_32_master.RegisterReply'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, F@_4, TrUserData)
+                0 -> 'skip_varint_master.RegisterReply'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+                1 -> 'skip_64_master.RegisterReply'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+                2 -> 'skip_length_delimited_master.RegisterReply'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+                3 -> 'skip_group_master.RegisterReply'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+                5 -> 'skip_32_master.RegisterReply'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData)
             end
     end;
-'dg_read_field_def_master.RegisterReply'(<<>>, 0, 0, _, F@_1, F@_2, R1, R2, TrUserData) ->
-    S1 = #{partition => F@_1},
+'dg_read_field_def_master.RegisterReply'(<<>>, 0, 0, _, F@_1, F@_2, R1, R2, R3, TrUserData) ->
+    S1 = #{partition => F@_1, leaderChoices => lists_reverse(R3, TrUserData)},
     S2 = if F@_2 == '$undef' -> S1;
             true -> S1#{leader => F@_2}
          end,
@@ -663,13 +785,13 @@ decode_msg_2_doit('master.Response', Bin, TrUserData) -> id('decode_msg_master.R
        true -> S3#{localNodes => lists_reverse(R2, TrUserData)}
     end.
 
-'d_field_master.RegisterReply_partition'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, TrUserData) when N < 57 -> 'd_field_master.RegisterReply_partition'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, TrUserData);
-'d_field_master.RegisterReply_partition'(<<0:1, X:7, Rest/binary>>, N, Acc, F, _, F@_2, F@_3, F@_4, TrUserData) ->
+'d_field_master.RegisterReply_partition'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 -> 'd_field_master.RegisterReply_partition'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+'d_field_master.RegisterReply_partition'(<<0:1, X:7, Rest/binary>>, N, Acc, F, _, F@_2, F@_3, F@_4, F@_5, TrUserData) ->
     {NewFValue, RestF} = {id((X bsl N + Acc) band 4294967295, TrUserData), Rest},
-    'dfp_read_field_def_master.RegisterReply'(RestF, 0, 0, F, NewFValue, F@_2, F@_3, F@_4, TrUserData).
+    'dfp_read_field_def_master.RegisterReply'(RestF, 0, 0, F, NewFValue, F@_2, F@_3, F@_4, F@_5, TrUserData).
 
-'d_field_master.RegisterReply_leader'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, TrUserData) when N < 57 -> 'd_field_master.RegisterReply_leader'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, TrUserData);
-'d_field_master.RegisterReply_leader'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, Prev, F@_3, F@_4, TrUserData) ->
+'d_field_master.RegisterReply_leader'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 -> 'd_field_master.RegisterReply_leader'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+'d_field_master.RegisterReply_leader'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, Prev, F@_3, F@_4, F@_5, TrUserData) ->
     {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bs:Len/binary, Rest2/binary>> = Rest, {id('decode_msg_master.Address'(Bs, TrUserData), TrUserData), Rest2} end,
     'dfp_read_field_def_master.RegisterReply'(RestF,
                                               0,
@@ -681,34 +803,43 @@ decode_msg_2_doit('master.Response', Bin, TrUserData) -> id('decode_msg_master.R
                                               end,
                                               F@_3,
                                               F@_4,
+                                              F@_5,
                                               TrUserData).
 
-'d_field_master.RegisterReply_siblings'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, TrUserData) when N < 57 -> 'd_field_master.RegisterReply_siblings'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, TrUserData);
-'d_field_master.RegisterReply_siblings'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, Prev, F@_4, TrUserData) ->
+'d_field_master.RegisterReply_siblings'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 -> 'd_field_master.RegisterReply_siblings'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+'d_field_master.RegisterReply_siblings'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, Prev, F@_4, F@_5, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bs:Len/binary, Rest2/binary>> = Rest, {id('decode_msg_master.SiblingLatency'(Bs, TrUserData), TrUserData), Rest2} end,
+    'dfp_read_field_def_master.RegisterReply'(RestF, 0, 0, F, F@_1, F@_2, cons(NewFValue, Prev, TrUserData), F@_4, F@_5, TrUserData).
+
+'d_field_master.RegisterReply_localNodes'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 ->
+    'd_field_master.RegisterReply_localNodes'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+'d_field_master.RegisterReply_localNodes'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, Prev, F@_5, TrUserData) ->
     {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bs:Len/binary, Rest2/binary>> = Rest, {id('decode_msg_master.Address'(Bs, TrUserData), TrUserData), Rest2} end,
-    'dfp_read_field_def_master.RegisterReply'(RestF, 0, 0, F, F@_1, F@_2, cons(NewFValue, Prev, TrUserData), F@_4, TrUserData).
+    'dfp_read_field_def_master.RegisterReply'(RestF, 0, 0, F, F@_1, F@_2, F@_3, cons(NewFValue, Prev, TrUserData), F@_5, TrUserData).
 
-'d_field_master.RegisterReply_localNodes'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, TrUserData) when N < 57 -> 'd_field_master.RegisterReply_localNodes'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, TrUserData);
-'d_field_master.RegisterReply_localNodes'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, Prev, TrUserData) ->
-    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bs:Len/binary, Rest2/binary>> = Rest, {id('decode_msg_master.Address'(Bs, TrUserData), TrUserData), Rest2} end,
-    'dfp_read_field_def_master.RegisterReply'(RestF, 0, 0, F, F@_1, F@_2, F@_3, cons(NewFValue, Prev, TrUserData), TrUserData).
+'d_field_master.RegisterReply_leaderChoices'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 ->
+    'd_field_master.RegisterReply_leaderChoices'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+'d_field_master.RegisterReply_leaderChoices'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, Prev, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bytes:Len/binary, Rest2/binary>> = Rest, Bytes2 = binary:copy(Bytes), {id(Bytes2, TrUserData), Rest2} end,
+    'dfp_read_field_def_master.RegisterReply'(RestF, 0, 0, F, F@_1, F@_2, F@_3, F@_4, cons(NewFValue, Prev, TrUserData), TrUserData).
 
-'skip_varint_master.RegisterReply'(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, TrUserData) -> 'skip_varint_master.RegisterReply'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, TrUserData);
-'skip_varint_master.RegisterReply'(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, TrUserData) -> 'dfp_read_field_def_master.RegisterReply'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, TrUserData).
+'skip_varint_master.RegisterReply'(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> 'skip_varint_master.RegisterReply'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+'skip_varint_master.RegisterReply'(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> 'dfp_read_field_def_master.RegisterReply'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData).
 
-'skip_length_delimited_master.RegisterReply'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, TrUserData) when N < 57 -> 'skip_length_delimited_master.RegisterReply'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, TrUserData);
-'skip_length_delimited_master.RegisterReply'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, TrUserData) ->
+'skip_length_delimited_master.RegisterReply'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 ->
+    'skip_length_delimited_master.RegisterReply'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+'skip_length_delimited_master.RegisterReply'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) ->
     Length = X bsl N + Acc,
     <<_:Length/binary, Rest2/binary>> = Rest,
-    'dfp_read_field_def_master.RegisterReply'(Rest2, 0, 0, F, F@_1, F@_2, F@_3, F@_4, TrUserData).
+    'dfp_read_field_def_master.RegisterReply'(Rest2, 0, 0, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData).
 
-'skip_group_master.RegisterReply'(Bin, _, Z2, FNum, F@_1, F@_2, F@_3, F@_4, TrUserData) ->
+'skip_group_master.RegisterReply'(Bin, _, Z2, FNum, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) ->
     {_, Rest} = read_group(Bin, FNum),
-    'dfp_read_field_def_master.RegisterReply'(Rest, 0, Z2, FNum, F@_1, F@_2, F@_3, F@_4, TrUserData).
+    'dfp_read_field_def_master.RegisterReply'(Rest, 0, Z2, FNum, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData).
 
-'skip_32_master.RegisterReply'(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, TrUserData) -> 'dfp_read_field_def_master.RegisterReply'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, TrUserData).
+'skip_32_master.RegisterReply'(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> 'dfp_read_field_def_master.RegisterReply'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData).
 
-'skip_64_master.RegisterReply'(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, TrUserData) -> 'dfp_read_field_def_master.RegisterReply'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, TrUserData).
+'skip_64_master.RegisterReply'(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> 'dfp_read_field_def_master.RegisterReply'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData).
 
 'decode_msg_master.GetNodesReply'(Bin, TrUserData) -> 'dfp_read_field_def_master.GetNodesReply'(Bin, 0, 0, 0, id([], TrUserData), TrUserData).
 
@@ -1013,6 +1144,7 @@ merge_msgs(Prev, New, MsgName, Opts) ->
     case MsgName of
         'master.Address' -> 'merge_msg_master.Address'(Prev, New, TrUserData);
         'master.Register' -> 'merge_msg_master.Register'(Prev, New, TrUserData);
+        'master.SiblingLatency' -> 'merge_msg_master.SiblingLatency'(Prev, New, TrUserData);
         'master.RegisterReply' -> 'merge_msg_master.RegisterReply'(Prev, New, TrUserData);
         'master.GetNodesReply' -> 'merge_msg_master.GetNodesReply'(Prev, New, TrUserData);
         'master.Request' -> 'merge_msg_master.Request'(Prev, New, TrUserData);
@@ -1067,6 +1199,21 @@ merge_msgs(Prev, New, MsgName, Opts) ->
         _ -> S4
     end.
 
+-compile({nowarn_unused_function,'merge_msg_master.SiblingLatency'/3}).
+'merge_msg_master.SiblingLatency'(PMsg, NMsg, TrUserData) ->
+    S1 = #{},
+    S2 = case {PMsg, NMsg} of
+             {#{addr := PFaddr}, #{addr := NFaddr}} -> S1#{addr => 'merge_msg_master.Address'(PFaddr, NFaddr, TrUserData)};
+             {_, #{addr := NFaddr}} -> S1#{addr => NFaddr};
+             {#{addr := PFaddr}, _} -> S1#{addr => PFaddr};
+             {_, _} -> S1
+         end,
+    case {PMsg, NMsg} of
+        {_, #{latency := NFlatency}} -> S2#{latency => NFlatency};
+        {#{latency := PFlatency}, _} -> S2#{latency => PFlatency};
+        _ -> S2
+    end.
+
 -compile({nowarn_unused_function,'merge_msg_master.RegisterReply'/3}).
 'merge_msg_master.RegisterReply'(PMsg, NMsg, TrUserData) ->
     S1 = #{},
@@ -1087,11 +1234,17 @@ merge_msgs(Prev, New, MsgName, Opts) ->
              {#{siblings := PFsiblings}, _} -> S3#{siblings => PFsiblings};
              {_, _} -> S3
          end,
+    S5 = case {PMsg, NMsg} of
+             {#{localNodes := PFlocalNodes}, #{localNodes := NFlocalNodes}} -> S4#{localNodes => 'erlang_++'(PFlocalNodes, NFlocalNodes, TrUserData)};
+             {_, #{localNodes := NFlocalNodes}} -> S4#{localNodes => NFlocalNodes};
+             {#{localNodes := PFlocalNodes}, _} -> S4#{localNodes => PFlocalNodes};
+             {_, _} -> S4
+         end,
     case {PMsg, NMsg} of
-        {#{localNodes := PFlocalNodes}, #{localNodes := NFlocalNodes}} -> S4#{localNodes => 'erlang_++'(PFlocalNodes, NFlocalNodes, TrUserData)};
-        {_, #{localNodes := NFlocalNodes}} -> S4#{localNodes => NFlocalNodes};
-        {#{localNodes := PFlocalNodes}, _} -> S4#{localNodes => PFlocalNodes};
-        {_, _} -> S4
+        {#{leaderChoices := PFleaderChoices}, #{leaderChoices := NFleaderChoices}} -> S5#{leaderChoices => 'erlang_++'(PFleaderChoices, NFleaderChoices, TrUserData)};
+        {_, #{leaderChoices := NFleaderChoices}} -> S5#{leaderChoices => NFleaderChoices};
+        {#{leaderChoices := PFleaderChoices}, _} -> S5#{leaderChoices => PFleaderChoices};
+        {_, _} -> S5
     end.
 
 -compile({nowarn_unused_function,'merge_msg_master.GetNodesReply'/3}).
@@ -1144,6 +1297,7 @@ verify_msg(Msg, MsgName, Opts) ->
     case MsgName of
         'master.Address' -> 'v_msg_master.Address'(Msg, [MsgName], TrUserData);
         'master.Register' -> 'v_msg_master.Register'(Msg, [MsgName], TrUserData);
+        'master.SiblingLatency' -> 'v_msg_master.SiblingLatency'(Msg, [MsgName], TrUserData);
         'master.RegisterReply' -> 'v_msg_master.RegisterReply'(Msg, [MsgName], TrUserData);
         'master.GetNodesReply' -> 'v_msg_master.GetNodesReply'(Msg, [MsgName], TrUserData);
         'master.Request' -> 'v_msg_master.Request'(Msg, [MsgName], TrUserData);
@@ -1212,6 +1366,26 @@ verify_msg(Msg, MsgName, Opts) ->
 'v_msg_master.Register'(M, Path, _TrUserData) when is_map(M) -> mk_type_error({missing_fields, [] -- maps:keys(M), 'master.Register'}, M, Path);
 'v_msg_master.Register'(X, Path, _TrUserData) -> mk_type_error({expected_msg, 'master.Register'}, X, Path).
 
+-compile({nowarn_unused_function,'v_msg_master.SiblingLatency'/3}).
+-dialyzer({nowarn_function,'v_msg_master.SiblingLatency'/3}).
+'v_msg_master.SiblingLatency'(#{} = M, Path, TrUserData) ->
+    case M of
+        #{addr := F1} -> 'v_msg_master.Address'(F1, [addr | Path], TrUserData);
+        _ -> ok
+    end,
+    case M of
+        #{latency := F2} -> v_type_uint32(F2, [latency | Path], TrUserData);
+        _ -> ok
+    end,
+    lists:foreach(fun (addr) -> ok;
+                      (latency) -> ok;
+                      (OtherKey) -> mk_type_error({extraneous_key, OtherKey}, M, Path)
+                  end,
+                  maps:keys(M)),
+    ok;
+'v_msg_master.SiblingLatency'(M, Path, _TrUserData) when is_map(M) -> mk_type_error({missing_fields, [] -- maps:keys(M), 'master.SiblingLatency'}, M, Path);
+'v_msg_master.SiblingLatency'(X, Path, _TrUserData) -> mk_type_error({expected_msg, 'master.SiblingLatency'}, X, Path).
+
 -compile({nowarn_unused_function,'v_msg_master.RegisterReply'/3}).
 -dialyzer({nowarn_function,'v_msg_master.RegisterReply'/3}).
 'v_msg_master.RegisterReply'(#{} = M, Path, TrUserData) ->
@@ -1226,9 +1400,9 @@ verify_msg(Msg, MsgName, Opts) ->
     case M of
         #{siblings := F3} ->
             if is_list(F3) ->
-                   _ = ['v_msg_master.Address'(Elem, [siblings | Path], TrUserData) || Elem <- F3],
+                   _ = ['v_msg_master.SiblingLatency'(Elem, [siblings | Path], TrUserData) || Elem <- F3],
                    ok;
-               true -> mk_type_error({invalid_list_of, {msg, 'master.Address'}}, F3, [siblings | Path])
+               true -> mk_type_error({invalid_list_of, {msg, 'master.SiblingLatency'}}, F3, [siblings | Path])
             end;
         _ -> ok
     end,
@@ -1241,10 +1415,20 @@ verify_msg(Msg, MsgName, Opts) ->
             end;
         _ -> ok
     end,
+    case M of
+        #{leaderChoices := F5} ->
+            if is_list(F5) ->
+                   _ = [v_type_string(Elem, [leaderChoices | Path], TrUserData) || Elem <- F5],
+                   ok;
+               true -> mk_type_error({invalid_list_of, string}, F5, [leaderChoices | Path])
+            end;
+        _ -> ok
+    end,
     lists:foreach(fun (partition) -> ok;
                       (leader) -> ok;
                       (siblings) -> ok;
                       (localNodes) -> ok;
+                      (leaderChoices) -> ok;
                       (OtherKey) -> mk_type_error({extraneous_key, OtherKey}, M, Path)
                   end,
                   maps:keys(M)),

@@ -15,11 +15,17 @@ message Register {
   uint32 remotePort = 4;
 }
 
+message SiblingLatency {
+  Address addr = 1;
+  uint32 latency = 2;
+}
+
 message RegisterReply {
   uint32 partition = 1;
   Address leader = 2;
-  repeated Address siblings = 3;
+  repeated SiblingLatency siblings = 3;
   repeated Address localNodes = 4;
+  repeated string leaderChoices = 5;
 }
 
 message GetNodesReply {
