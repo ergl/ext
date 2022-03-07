@@ -34,9 +34,9 @@ replica_info(MyReplica, Address, Port) ->
             {error, Reason};
         {ok, Sock} ->
             {ok, {LocalIp, _}} = inet:sockname(Sock),
-            %% TODO(borja): Are sequence numbers needed for master?
             Request = #{seq => 0, payload => {getReplicaNodes, MyReplica}},
-            ok = gen_tcp:send(Sock, ext_master_proto:encode_msg(Request, 'master.Request')),
+            Msg = ext_master_proto:encode_msg(Request, 'master.Request'),
+            ok = gen_tcp:send(Sock, Msg),
             Reply =
                 case gen_tcp:recv(Sock, 0) of
                     {error, Reason} ->
