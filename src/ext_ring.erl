@@ -99,7 +99,6 @@ convert_key_hash(Key) ->
 
 -spec transform_addrs(#{}) -> [{partition_id(), node_ip(), inet:port_number()}].
 transform_addrs(Addrs) ->
-    io:format("transform_addrs := ~p~n", [Addrs]),
     [begin
         {ok, Addr} = inet:getaddr(binary_to_list(IP), inet),
         {P, inet:ntoa(Addr), Port}
