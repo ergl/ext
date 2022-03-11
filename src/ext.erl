@@ -166,11 +166,12 @@ async_read(#coordinator{ring=Ring, conn_pool=Pools},
     {ok, ReqId} = ext_shackle_transport:read_request(Pool, maps:get(Idx, Leaders, empty), TxId, Ts, Key),
     {ok, {read, ReqId, Idx}}.
 
--spec await_read(t(), tx(), read_req_id()) -> {ok, binary(), tx()} | error.
+-spec await_read(t(), tx(), read_req_id()) -> {ok, binary(), tx()} | {error, tx()}.
 await_read(_, Tx=#transaction{ballots=Ballots, leaders=Leaders}, {read, ReqId, Idx={P, Node}}) ->
     case shackle:receive_response(ReqId) of
         error ->
-            error;
+            {error, set_tx_init_node(Tx#transaction{leaders=Leaders#{Idx => <<>>}},
+                                     Node)};
 
         {ok, Ballot, ShardLeader, Value} ->
             Tx1 = Tx#transaction{ballots=Ballots#{P => Ballot},
@@ -189,11 +190,12 @@ async_update(#coordinator{ring=Ring, conn_pool=Pools},
     {ok, ReqId} = ext_shackle_transport:update_request(Pool, maps:get(Idx, Leaders, empty), TxId, Ts, Key, Value),
     {ok, {update, ReqId, Idx}}.
 
--spec await_update(t(), tx(), update_req_id()) -> {ok, tx()} | error.
+-spec await_update(t(), tx(), update_req_id()) -> {ok, tx()} | {error, tx()}.
 await_update(_, Tx=#transaction{ballots=Ballots, leaders=Leaders}, {update, ReqId, Idx={P, Node}}) ->
     case shackle:receive_response(ReqId) of
         error ->
-            error;
+            {error, set_tx_init_node(Tx#transaction{leaders=Leaders#{Idx => <<>>}},
+                                     Node)};
 
         {ok, Ballot, ShardLeader} ->
             Tx1 = Tx#transaction{ballots=Ballots#{P => Ballot},
@@ -202,12 +204,12 @@ await_update(_, Tx=#transaction{ballots=Ballots, leaders=Leaders}, {update, ReqI
             {ok, set_tx_init_node(Tx1, Node)}
     end.
 
--spec sync_read(t(), tx(), binary()) -> {ok, binary(), tx()} | error.
+-spec sync_read(t(), tx(), binary()) -> {ok, binary(), tx()} | {error, tx()}.
 sync_read(Coord, Tx, Key) ->
     {ok, Req} = async_read(Coord, Tx, Key),
     await_read(Coord, Tx, Req).
 
--spec sync_update(t(), tx(), binary(), binary()) -> {ok, tx()} | error.
+-spec sync_update(t(), tx(), binary(), binary()) -> {ok, tx()} | {error, tx()}.
 sync_update(Coord, Tx, Key, Value) ->
     {ok, Req} = async_update(Coord, Tx, Key, Value),
     await_update(Coord, Tx, Req).
