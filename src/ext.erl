@@ -26,7 +26,10 @@
          await_update/3]).
 
 %% Commit / Release API
--export([commit/2,
+-export([async_commit/3,
+         await_commit/2,
+         commit/2,
+         commit/3,
          release/2]).
 
 -record(coordinator, {
@@ -57,10 +60,9 @@
 
 -opaque read_req_id() :: {read, shackle:external_request_id(), index_node()}.
 -opaque update_req_id() :: {update, shackle:external_request_id(), index_node()}.
+-opaque commit_req_id() :: {commit, shackle:external_request_id()} | empty_commit.
 
--opaque no_tx_read_req_id() :: {read, shackle:external_request_id()}.
-
--export_type([t/0, tx/0, read_req_id/0, update_req_id/0, no_tx_read_req_id/0]).
+-export_type([t/0, tx/0, read_req_id/0, update_req_id/0, commit_req_id/0]).
 
 %%====================================================================
 %% Library APP functions
@@ -137,13 +139,41 @@ start_transaction(#coordinator{tx_id_prefix=Prefix}, Id) ->
     {ok, #transaction{id=make_id_from_prefix(Prefix, Id),
                       timestamp=erlang:system_time(nanosecond)}}.
 
--spec commit(t(), tx()) -> ok | error.
-commit(_, #transaction{init_node=undefined}) ->
+-spec async_commit(t(), tx(), timeout()) -> {ok, commit_req_id()}.
+async_commit(_, #transaction{init_node=undefined}, _) ->
+    %% If the transaction never read anything, we bypass 2PC
+    {ok, empty_commit};
+
+async_commit(#coordinator{conn_pool=Pools},
+             #transaction{id=TxId, init_node=Idx, timestamp=Ts, ballots=Ballots},
+             Timeout) ->
+    Pool = maps:get(Idx, Pools),
+    {ok, ReqId} = ext_shackle_transport:commit_request(Pool, TxId, Ts, Ballots, Timeout),
+    {ok, {commit, ReqId}}.
+
+-spec await_commit(t(), commit_req_id()) -> ok | error.
+await_commit(_, empty_commit) ->
     %% If the transaction never read anything, we bypass 2PC
     ok;
-commit(#coordinator{conn_pool=Pools}, #transaction{id=TxId, init_node=Idx, timestamp=Ts, ballots=Ballots}) ->
-    Pool = maps:get(Idx, Pools),
-    ext_shackle_transport:commit(Pool, TxId, Ts, Ballots).
+
+await_commit(_, {commit, ReqId}) ->
+    case shackle:receive_response(ReqId) of
+        {error, _} ->
+            error;
+        error ->
+            error;
+        ok ->
+            ok
+    end.
+
+-spec commit(t(), tx()) -> ok | error.
+commit(Coord, Tx) ->
+    commit(Coord, Tx, infinity).
+
+-spec commit(t(), tx(), timeout()) -> ok | error.
+commit(Coord, Tx, Timeout) ->
+    {ok, Req} = async_commit(Coord, Tx, Timeout),
+    await_commit(Coord, Req).
 
 -spec release(t(), tx()) -> ok.
 release(_, #transaction{init_node=undefined}) ->

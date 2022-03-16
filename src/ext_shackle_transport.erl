@@ -4,7 +4,7 @@
 
 -export([read_request/5,
          update_request/6,
-         commit/4,
+         commit_request/5,
          release/3]).
 
 -export([ping/2]).
@@ -49,9 +49,16 @@ read_request(Pool, PrevLeader, TxId, Timestamp, Key) ->
 update_request(Pool, PrevLeader, TxId, Timestamp, Key, Value) ->
     shackle:cast(Pool, {update, PrevLeader, TxId, Timestamp, Key, Value}, self(), infinity).
 
--spec commit(shackle_pool(), binary(), timestamp(), #{partition_id() => ballot()}) -> ok | error.
-commit(Pool, TxId, Timestamp, Ballots) ->
-    shackle:call(Pool, {commit, TxId, Timestamp, Ballots}, infinity).
+-spec commit_request(
+    Pool :: shackle_pool(),
+    TxId :: binary(),
+    Timestamp :: timestamp(),
+    Ballots :: #{partition_id() => ballot()},
+    Timeout :: timeout()
+) -> {ok, shackle:external_request_id()}.
+%% When awaited, returns ok | error.
+commit_request(Pool, TxId, Timestamp, Ballots, Timeout) ->
+    shackle:cast(Pool, {commit, TxId, Timestamp, Ballots}, self(), Timeout).
 
 -spec release(shackle_pool(), binary(), replica_id()) -> ok.
 release(Pool, TxId, PrevLeader) ->
