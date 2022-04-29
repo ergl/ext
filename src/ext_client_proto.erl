@@ -70,7 +70,7 @@
 
 -type 'client.Release'() ::
       #{txId                    => unicode:chardata(), % = 1, optional
-        prevLeader              => unicode:chardata() % = 2, optional
+        prevLeaders             => #{non_neg_integer() => unicode:chardata()} % = 2
        }.
 
 -type 'client.ClientPing'() ::
@@ -416,13 +416,10 @@ encode_msg(Msg, MsgName, Opts) ->
              _ -> Bin
          end,
     case M of
-        #{prevLeader := F2} ->
-            begin
-                TrF2 = id(F2, TrUserData),
-                case is_empty_string(TrF2) of
-                    true -> B1;
-                    false -> e_type_string(TrF2, <<B1/binary, 18>>, TrUserData)
-                end
+        #{prevLeaders := F2} ->
+            TrF2 = 'tr_encode_client.Release.prevLeaders'(F2, TrUserData),
+            if TrF2 == [] -> B1;
+               true -> 'e_field_client.Release_prevLeaders'(TrF2, B1, TrUserData)
             end;
         _ -> B1
     end.
@@ -509,6 +506,17 @@ encode_msg(Msg, MsgName, Opts) ->
     'e_field_client.Commit_ballots'(Rest, Bin3, TrUserData);
 'e_field_client.Commit_ballots'([], Bin, _TrUserData) -> Bin.
 
+'e_mfield_client.Release_prevLeaders'(Msg, Bin, TrUserData) ->
+    SubBin = 'encode_msg_map<uint32,string>'(Msg, <<>>, TrUserData),
+    Bin2 = e_varint(byte_size(SubBin), Bin),
+    <<Bin2/binary, SubBin/binary>>.
+
+'e_field_client.Release_prevLeaders'([Elem | Rest], Bin, TrUserData) ->
+    Bin2 = <<Bin/binary, 18>>,
+    Bin3 = 'e_mfield_client.Release_prevLeaders'('tr_encode_client.Release.prevLeaders[x]'(Elem, TrUserData), Bin2, TrUserData),
+    'e_field_client.Release_prevLeaders'(Rest, Bin3, TrUserData);
+'e_field_client.Release_prevLeaders'([], Bin, _TrUserData) -> Bin.
+
 'e_mfield_client.Request_read'(Msg, Bin, TrUserData) ->
     SubBin = 'encode_msg_client.Read'(Msg, <<>>, TrUserData),
     Bin2 = e_varint(byte_size(SubBin), Bin),
@@ -557,6 +565,10 @@ encode_msg(Msg, MsgName, Opts) ->
 'e_mfield_client.Response_load'(_Msg, Bin, _TrUserData) -> <<Bin/binary, 0>>.
 
 'e_mfield_client.Response_pong'(_Msg, Bin, _TrUserData) -> <<Bin/binary, 0>>.
+
+'encode_msg_map<uint32,string>'(#{key := F1, value := F2}, Bin, TrUserData) ->
+    B1 = begin TrF1 = id(F1, TrUserData), e_varint(TrF1, <<Bin/binary, 8>>, TrUserData) end,
+    begin TrF2 = id(F2, TrUserData), e_type_string(TrF2, <<B1/binary, 18>>, TrUserData) end.
 
 'encode_msg_map<uint32,uint32>'(#{key := F1, value := F2}, Bin, TrUserData) ->
     B1 = begin TrF1 = id(F1, TrUserData), e_varint(TrF1, <<Bin/binary, 8>>, TrUserData) end,
@@ -1216,11 +1228,11 @@ decode_msg_2_doit('client.Response', Bin, TrUserData) -> id('decode_msg_client.R
 
 'skip_64_client.CommitReply'(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> 'dfp_read_field_def_client.CommitReply'(Rest, Z1, Z2, F, F@_1, TrUserData).
 
-'decode_msg_client.Release'(Bin, TrUserData) -> 'dfp_read_field_def_client.Release'(Bin, 0, 0, 0, id(<<>>, TrUserData), id(<<>>, TrUserData), TrUserData).
+'decode_msg_client.Release'(Bin, TrUserData) -> 'dfp_read_field_def_client.Release'(Bin, 0, 0, 0, id(<<>>, TrUserData), 'tr_decode_init_default_client.Release.prevLeaders'([], TrUserData), TrUserData).
 
 'dfp_read_field_def_client.Release'(<<10, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.Release_txId'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
-'dfp_read_field_def_client.Release'(<<18, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.Release_prevLeader'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
-'dfp_read_field_def_client.Release'(<<>>, 0, 0, _, F@_1, F@_2, _) -> #{txId => F@_1, prevLeader => F@_2};
+'dfp_read_field_def_client.Release'(<<18, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.Release_prevLeaders'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+'dfp_read_field_def_client.Release'(<<>>, 0, 0, _, F@_1, R1, TrUserData) -> #{txId => F@_1, prevLeaders => 'tr_decode_repeated_finalize_client.Release.prevLeaders'(R1, TrUserData)};
 'dfp_read_field_def_client.Release'(Other, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dg_read_field_def_client.Release'(Other, Z1, Z2, F, F@_1, F@_2, TrUserData).
 
 'dg_read_field_def_client.Release'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 32 - 7 -> 'dg_read_field_def_client.Release'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
@@ -1228,7 +1240,7 @@ decode_msg_2_doit('client.Response', Bin, TrUserData) -> id('decode_msg_client.R
     Key = X bsl N + Acc,
     case Key of
         10 -> 'd_field_client.Release_txId'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
-        18 -> 'd_field_client.Release_prevLeader'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
+        18 -> 'd_field_client.Release_prevLeaders'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
         _ ->
             case Key band 7 of
                 0 -> 'skip_varint_client.Release'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
@@ -1238,17 +1250,17 @@ decode_msg_2_doit('client.Response', Bin, TrUserData) -> id('decode_msg_client.R
                 5 -> 'skip_32_client.Release'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData)
             end
     end;
-'dg_read_field_def_client.Release'(<<>>, 0, 0, _, F@_1, F@_2, _) -> #{txId => F@_1, prevLeader => F@_2}.
+'dg_read_field_def_client.Release'(<<>>, 0, 0, _, F@_1, R1, TrUserData) -> #{txId => F@_1, prevLeaders => 'tr_decode_repeated_finalize_client.Release.prevLeaders'(R1, TrUserData)}.
 
 'd_field_client.Release_txId'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'd_field_client.Release_txId'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
 'd_field_client.Release_txId'(<<0:1, X:7, Rest/binary>>, N, Acc, F, _, F@_2, TrUserData) ->
     {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bytes:Len/binary, Rest2/binary>> = Rest, Bytes2 = binary:copy(Bytes), {id(Bytes2, TrUserData), Rest2} end,
     'dfp_read_field_def_client.Release'(RestF, 0, 0, F, NewFValue, F@_2, TrUserData).
 
-'d_field_client.Release_prevLeader'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'd_field_client.Release_prevLeader'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
-'d_field_client.Release_prevLeader'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, _, TrUserData) ->
-    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bytes:Len/binary, Rest2/binary>> = Rest, Bytes2 = binary:copy(Bytes), {id(Bytes2, TrUserData), Rest2} end,
-    'dfp_read_field_def_client.Release'(RestF, 0, 0, F, F@_1, NewFValue, TrUserData).
+'d_field_client.Release_prevLeaders'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'd_field_client.Release_prevLeaders'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'d_field_client.Release_prevLeaders'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, Prev, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bs:Len/binary, Rest2/binary>> = Rest, {id('decode_msg_map<uint32,string>'(Bs, TrUserData), TrUserData), Rest2} end,
+    'dfp_read_field_def_client.Release'(RestF, 0, 0, F, F@_1, 'tr_decode_repeated_add_elem_client.Release.prevLeaders'(NewFValue, Prev, TrUserData), TrUserData).
 
 'skip_varint_client.Release'(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'skip_varint_client.Release'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
 'skip_varint_client.Release'(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_client.Release'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
@@ -1636,6 +1648,57 @@ decode_msg_2_doit('client.Response', Bin, TrUserData) -> id('decode_msg_client.R
 
 'skip_64_client.Response'(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_client.Response'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
 
+'decode_msg_map<uint32,string>'(Bin, TrUserData) -> 'dfp_read_field_def_map<uint32,string>'(Bin, 0, 0, 0, id(0, TrUserData), id(<<>>, TrUserData), TrUserData).
+
+'dfp_read_field_def_map<uint32,string>'(<<8, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_map<uint32,string>_key'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+'dfp_read_field_def_map<uint32,string>'(<<18, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_map<uint32,string>_value'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+'dfp_read_field_def_map<uint32,string>'(<<>>, 0, 0, _, F@_1, F@_2, _) -> #{key => F@_1, value => F@_2};
+'dfp_read_field_def_map<uint32,string>'(Other, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dg_read_field_def_map<uint32,string>'(Other, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+'dg_read_field_def_map<uint32,string>'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 32 - 7 -> 'dg_read_field_def_map<uint32,string>'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'dg_read_field_def_map<uint32,string>'(<<0:1, X:7, Rest/binary>>, N, Acc, _, F@_1, F@_2, TrUserData) ->
+    Key = X bsl N + Acc,
+    case Key of
+        8 -> 'd_field_map<uint32,string>_key'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
+        18 -> 'd_field_map<uint32,string>_value'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
+        _ ->
+            case Key band 7 of
+                0 -> 'skip_varint_map<uint32,string>'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                1 -> 'skip_64_map<uint32,string>'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                2 -> 'skip_length_delimited_map<uint32,string>'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                3 -> 'skip_group_map<uint32,string>'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                5 -> 'skip_32_map<uint32,string>'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData)
+            end
+    end;
+'dg_read_field_def_map<uint32,string>'(<<>>, 0, 0, _, F@_1, F@_2, _) -> #{key => F@_1, value => F@_2}.
+
+'d_field_map<uint32,string>_key'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'd_field_map<uint32,string>_key'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'d_field_map<uint32,string>_key'(<<0:1, X:7, Rest/binary>>, N, Acc, F, _, F@_2, TrUserData) ->
+    {NewFValue, RestF} = {id((X bsl N + Acc) band 4294967295, TrUserData), Rest},
+    'dfp_read_field_def_map<uint32,string>'(RestF, 0, 0, F, NewFValue, F@_2, TrUserData).
+
+'d_field_map<uint32,string>_value'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'd_field_map<uint32,string>_value'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'d_field_map<uint32,string>_value'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, _, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bytes:Len/binary, Rest2/binary>> = Rest, Bytes2 = binary:copy(Bytes), {id(Bytes2, TrUserData), Rest2} end,
+    'dfp_read_field_def_map<uint32,string>'(RestF, 0, 0, F, F@_1, NewFValue, TrUserData).
+
+'skip_varint_map<uint32,string>'(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'skip_varint_map<uint32,string>'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+'skip_varint_map<uint32,string>'(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_map<uint32,string>'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+'skip_length_delimited_map<uint32,string>'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'skip_length_delimited_map<uint32,string>'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'skip_length_delimited_map<uint32,string>'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) ->
+    Length = X bsl N + Acc,
+    <<_:Length/binary, Rest2/binary>> = Rest,
+    'dfp_read_field_def_map<uint32,string>'(Rest2, 0, 0, F, F@_1, F@_2, TrUserData).
+
+'skip_group_map<uint32,string>'(Bin, _, Z2, FNum, F@_1, F@_2, TrUserData) ->
+    {_, Rest} = read_group(Bin, FNum),
+    'dfp_read_field_def_map<uint32,string>'(Rest, 0, Z2, FNum, F@_1, F@_2, TrUserData).
+
+'skip_32_map<uint32,string>'(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_map<uint32,string>'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+'skip_64_map<uint32,string>'(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_map<uint32,string>'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
 'decode_msg_map<uint32,uint32>'(Bin, TrUserData) -> 'dfp_read_field_def_map<uint32,uint32>'(Bin, 0, 0, 0, id(0, TrUserData), id(0, TrUserData), TrUserData).
 
 'dfp_read_field_def_map<uint32,uint32>'(<<8, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_map<uint32,uint32>_key'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
@@ -1923,7 +1986,7 @@ merge_msgs(Prev, New, MsgName, Opts) ->
     end.
 
 -compile({nowarn_unused_function,'merge_msg_client.Release'/3}).
-'merge_msg_client.Release'(PMsg, NMsg, _) ->
+'merge_msg_client.Release'(PMsg, NMsg, TrUserData) ->
     S1 = #{},
     S2 = case {PMsg, NMsg} of
              {_, #{txId := NFtxId}} -> S1#{txId => NFtxId};
@@ -1931,9 +1994,10 @@ merge_msgs(Prev, New, MsgName, Opts) ->
              _ -> S1
          end,
     case {PMsg, NMsg} of
-        {_, #{prevLeader := NFprevLeader}} -> S2#{prevLeader => NFprevLeader};
-        {#{prevLeader := PFprevLeader}, _} -> S2#{prevLeader => PFprevLeader};
-        _ -> S2
+        {#{prevLeaders := PFprevLeaders}, #{prevLeaders := NFprevLeaders}} -> S2#{prevLeaders => 'tr_merge_client.Release.prevLeaders'(PFprevLeaders, NFprevLeaders, TrUserData)};
+        {_, #{prevLeaders := NFprevLeaders}} -> S2#{prevLeaders => NFprevLeaders};
+        {#{prevLeaders := PFprevLeaders}, _} -> S2#{prevLeaders => PFprevLeaders};
+        {_, _} -> S2
     end.
 
 -compile({nowarn_unused_function,'merge_msg_client.ClientPing'/3}).
@@ -2221,11 +2285,11 @@ verify_msg(Msg, MsgName, Opts) ->
         _ -> ok
     end,
     case M of
-        #{prevLeader := F2} -> v_type_string(F2, [prevLeader | Path], TrUserData);
+        #{prevLeaders := F2} -> 'v_map<uint32,string>'(F2, [prevLeaders | Path], TrUserData);
         _ -> ok
     end,
     lists:foreach(fun (txId) -> ok;
-                      (prevLeader) -> ok;
+                      (prevLeaders) -> ok;
                       (OtherKey) -> mk_type_error({extraneous_key, OtherKey}, M, Path)
                   end,
                   maps:keys(M)),
@@ -2344,6 +2408,13 @@ v_type_bytes(B, _Path, _TrUserData) when is_binary(B) -> ok;
 v_type_bytes(B, _Path, _TrUserData) when is_list(B) -> ok;
 v_type_bytes(X, Path, _TrUserData) -> mk_type_error(bad_binary_value, X, Path).
 
+-compile({nowarn_unused_function,'v_map<uint32,string>'/3}).
+-dialyzer({nowarn_function,'v_map<uint32,string>'/3}).
+'v_map<uint32,string>'(M, Path, TrUserData) when is_map(M) ->
+    [begin v_type_uint32(Key, [key | Path], TrUserData), v_type_string(Value, [value | Path], TrUserData) end || {Key, Value} <- maps:to_list(M)],
+    ok;
+'v_map<uint32,string>'(X, Path, _TrUserData) -> mk_type_error(invalid_map, X, Path).
+
 -compile({nowarn_unused_function,'v_map<uint32,uint32>'/3}).
 -dialyzer({nowarn_function,'v_map<uint32,uint32>'/3}).
 'v_map<uint32,uint32>'(M, Path, TrUserData) when is_map(M) ->
@@ -2386,6 +2457,21 @@ cons(Elem, Acc, _TrUserData) -> [Elem | Acc].
 -compile({nowarn_unused_function,'erlang_++'/3}).
 -compile({inline,'erlang_++'/3}).
 'erlang_++'(A, B, _TrUserData) -> A ++ B.
+-compile({inline,'tr_decode_init_default_client.Release.prevLeaders'/2}).
+'tr_decode_init_default_client.Release.prevLeaders'(_, _) -> mt_empty_map_m().
+
+-compile({inline,'tr_merge_client.Release.prevLeaders'/3}).
+'tr_merge_client.Release.prevLeaders'(X1, X2, _) -> mt_merge_maps_m(X1, X2).
+
+-compile({inline,'tr_decode_repeated_finalize_client.Release.prevLeaders'/2}).
+'tr_decode_repeated_finalize_client.Release.prevLeaders'(L, TrUserData) -> id(L, TrUserData).
+
+-compile({inline,'tr_encode_client.Release.prevLeaders'/2}).
+'tr_encode_client.Release.prevLeaders'(X, _) -> mt_map_to_list_m(X).
+
+-compile({inline,'tr_decode_repeated_add_elem_client.Release.prevLeaders'/3}).
+'tr_decode_repeated_add_elem_client.Release.prevLeaders'(Elem, L, _) -> mt_add_item_m(Elem, L).
+
 -compile({inline,'tr_decode_init_default_client.Commit.ballots'/2}).
 'tr_decode_init_default_client.Commit.ballots'(_, _) -> mt_empty_map_m().
 
@@ -2400,6 +2486,9 @@ cons(Elem, Acc, _TrUserData) -> [Elem | Acc].
 
 -compile({inline,'tr_decode_repeated_add_elem_client.Commit.ballots'/3}).
 'tr_decode_repeated_add_elem_client.Commit.ballots'(Elem, L, _) -> mt_add_item_m(Elem, L).
+
+-compile({inline,'tr_encode_client.Release.prevLeaders[x]'/2}).
+'tr_encode_client.Release.prevLeaders[x]'(X, _) -> mt_maptuple_to_pseudomsg_m(X).
 
 -compile({inline,'tr_encode_client.Commit.ballots[x]'/2}).
 'tr_encode_client.Commit.ballots[x]'(X, _) -> mt_maptuple_to_pseudomsg_m(X).

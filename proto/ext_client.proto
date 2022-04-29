@@ -55,7 +55,7 @@ message CommitReply {
 
 message Release {
   string txId = 1;
-  string prevLeader = 2;
+  map<uint32, string> prevLeaders = 2;
 }
 
 message ClientPing {

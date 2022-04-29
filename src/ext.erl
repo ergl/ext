@@ -179,13 +179,9 @@ commit(Coord, Tx, Timeout) ->
 release(_, #transaction{init_node=undefined}) ->
     %% If the transaction never read anything, return
     ok;
-release(#coordinator{conn_pool=Pools}, #transaction{id=TxId, leaders=Leaders}) ->
-    ok = maps:foreach(
-        fun({_, Node}, Leader) ->
-            ok = ext_shackle_transport:release(maps:get(Node, Pools), TxId, Leader)
-        end,
-        Leaders
-    ).
+release(#coordinator{conn_pool=Pools}, #transaction{id=TxId, init_node=Idx, leaders=Leaders}) ->
+    PrevLeaders = maps:from_list([{Partition, Prev} || {{Partition, _}, Prev} <- maps:to_list(Leaders)]),
+    ext_shackle_transport:release(maps:get(Idx, Pools), TxId, PrevLeaders).
 
 -spec async_read(t(), tx(), binary()) -> {ok, read_req_id()}.
 async_read(#coordinator{ring=Ring, conn_pool=Pools},

@@ -60,9 +60,9 @@ update_request(Pool, PrevLeader, TxId, Timestamp, Key, Value) ->
 commit_request(Pool, TxId, Timestamp, Ballots, Timeout) ->
     shackle:cast(Pool, {commit, TxId, Timestamp, Ballots}, self(), Timeout).
 
--spec release(shackle_pool(), binary(), replica_id()) -> ok.
-release(Pool, TxId, PrevLeader) ->
-    shackle:call(Pool, {release, TxId, PrevLeader}, infinity).
+-spec release(shackle_pool(), binary(), #{partition_id() => replica_id()}) -> ok.
+release(Pool, TxId, PrevLeaders) ->
+    shackle:call(Pool, {release, TxId, PrevLeaders}, infinity).
 
 %%%===================================================================
 %%% shackle callbacks
@@ -93,8 +93,8 @@ handle_request({commit, TxId, Timestamp, Ballots}, S=#state{req_counter=Req}) ->
     Msg = #{txId => TxId, timestamp => Timestamp, ballots => Ballots},
     {ok, Req, make_request(Req, {commit, Msg}), incr_req(S)};
 
-handle_request({release, TxId, PrevLeader}, S=#state{req_counter=Req}) ->
-    Msg = #{txId => TxId, prevLeader => PrevLeader},
+handle_request({release, TxId, PrevLeaders}, S=#state{req_counter=Req}) ->
+    Msg = #{txId => TxId, prevLeaders => PrevLeaders},
     %% Req = undefined means shackle won't wait for a reply
     {ok, undefined, make_request(Req, {release, Msg}), incr_req(S)};
 

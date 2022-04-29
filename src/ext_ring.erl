@@ -34,7 +34,7 @@ replica_info(MyReplica, Address, Port) ->
             {error, Reason};
         {ok, Sock} ->
             {ok, {LocalIp, _}} = inet:sockname(Sock),
-            Request = #{seq => 0, payload => {getReplicaNodes, MyReplica}},
+            Request = #{seq => 0, payload => {getReplicaNodes, #{forReplica => MyReplica}}},
             Msg = ext_master_proto:encode_msg(Request, 'master.Request'),
             ok = gen_tcp:send(Sock, Msg),
             Reply =
@@ -97,12 +97,16 @@ convert_key_hash(Key) ->
 %% Partition Internal functions
 %%====================================================================
 
--spec transform_addrs(#{}) -> [{partition_id(), node_ip(), inet:port_number()}].
+-spec transform_addrs(#{partition_id() => #{ip := unicode:chardata(), port := non_neg_integer()}}) -> [{partition_id(), node_ip(), inet:port_number()}].
 transform_addrs(Addrs) ->
-    [begin
-        {ok, Addr} = inet:getaddr(binary_to_list(IP), inet),
-        {P, inet:ntoa(Addr), Port}
-     end || #{partition := P, ip := IP, port := Port} <- Addrs].
+    maps:fold(
+        fun(P, #{ip := IP, port := Port}, Acc) ->
+            {ok, Addr} = inet:getaddr(binary_to_list(IP), inet),
+            [ {P, inet:ntoa(Addr), Port} | Acc ]
+        end,
+        [],
+        Addrs
+    ).
 
 -spec make_ring([{partition_id(), node_ip(), inet:port_number()}]) -> t().
 make_ring(Nodes) ->

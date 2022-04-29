@@ -2,34 +2,46 @@ syntax = "proto3";
 package master;
 
 message Address {
-  string replica = 1;
-  uint32 partition = 2;
-  string ip = 3;
-  uint32 port = 4;
+  string ip = 1;
+  uint32 port = 2;
 }
 
 message Register {
   string replicaId = 1;
-  string ip = 2;
-  uint32 localPort = 3;
-  uint32 remotePort = 4;
-}
-
-message SiblingLatency {
-  Address addr = 1;
-  uint32 latency = 2;
+  uint32 partition = 2;
+  string ip = 3;
+  uint32 clientPort = 4;
+  uint32 remotePort = 5;
 }
 
 message RegisterReply {
-  uint32 partition = 1;
-  Address leader = 2;
-  repeated SiblingLatency siblings = 3;
-  repeated Address localNodes = 4;
-  repeated string leaderChoices = 5;
+  message PartitionNodes {
+    map<string, Address> nodes = 1;
+  }
+
+  map<uint32, PartitionNodes> nodes = 1;
+  map<uint32, string> leaders = 2;
+  map<string, uint32> latencies = 3;
+  repeated string leaderChoices = 4;
+}
+
+message GetNearestReplica {
+  string currentReplica = 1;
+}
+
+message GetReplicaNodes {
+  string forReplica = 1;
 }
 
 message GetNodesReply {
-  repeated Address nodes = 1;
+  map<uint32, Address> nodes = 1;
+}
+
+message GetNearestReplicaReply {
+  string replica = 1;
+  uint32 out_latency = 2;
+  uint32 in_latency = 3;
+  GetNodesReply nodes = 4;
 }
 
 message Request {
@@ -40,10 +52,10 @@ message Request {
     Register registerNode = 2;
 
     // Called by any node or client
-    uint32 getPartitionLeader = 3;
+    GetNearestReplica getNearestReplica = 3;
 
     // Called by clients, used to learn the topology of the local replica
-    string getReplicaNodes = 4;
+    GetReplicaNodes getReplicaNodes = 4;
   }
 }
 
@@ -51,7 +63,7 @@ message Response {
   uint32 seq = 1;
   oneof payload {
     RegisterReply registerReply = 2;
-    Address getPartitionLeaderReply = 3;
-    GetNodesReply getReplicaNodesReply = 4;
+    GetNodesReply getReplicaNodesReply = 3;
+    GetNearestReplicaReply getNearestReplicaNodesReply = 4;
   }
 }
