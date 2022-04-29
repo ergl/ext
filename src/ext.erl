@@ -30,6 +30,7 @@
          await_commit/2,
          commit/2,
          commit/3,
+         commit_at/3,
          release/2]).
 
 -record(coordinator, {
@@ -169,6 +170,12 @@ await_commit(_, {commit, ReqId}) ->
 -spec commit(t(), tx()) -> ok | error.
 commit(Coord, Tx) ->
     commit(Coord, Tx, infinity).
+
+-spec commit_at(t(), tx(), index_node()) -> ok | error.
+commit_at(_, #transaction{init_node=undefined}, _) ->
+    ok;
+commit_at(Coord, Tx, {_, Idx}) ->
+    commit(Coord, Tx#transaction{init_node = Idx}, infinity).
 
 -spec commit(t(), tx(), timeout()) -> ok | error.
 commit(Coord, Tx, Timeout) ->
