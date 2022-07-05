@@ -192,10 +192,10 @@ release(#coordinator{conn_pool=Pools}, #transaction{id=TxId, init_node=Idx, lead
 
 -spec async_read(t(), tx(), binary()) -> {ok, read_req_id()}.
 async_read(#coordinator{ring=Ring, conn_pool=Pools},
-           #transaction{timestamp=Ts, id=TxId, leaders=Leaders},
+           Tx=#transaction{timestamp=Ts, id=TxId, leaders=Leaders},
            Key) ->
-    Idx={_, Node} = ext_ring:get_key_location(Ring, Key),
-    Pool = maps:get(Node, Pools),
+    Idx = ext_ring:get_key_location(Ring, Key),
+    Pool = maps:get(get_coord_node(Tx, Idx), Pools),
     {ok, ReqId} = ext_shackle_transport:read_request(Pool, maps:get(Idx, Leaders, empty), TxId, Ts, Key),
     {ok, {read, ReqId, Idx}}.
 
@@ -209,16 +209,16 @@ await_read(_, Tx=#transaction{ballots=Ballots, leaders=Leaders}, {read, ReqId, I
             Tx1 = Tx#transaction{ballots=Ballots#{P => Ballot},
                                  leaders=Leaders#{Idx => ShardLeader}},
 
-            {ok, Value, set_tx_init_node(Tx1, Node)}
+            {ok, Value, confirm_coord_node(Tx1, Node)}
     end.
 
 -spec async_update(t(), tx(), binary(), binary()) -> {ok, update_req_id()}.
 async_update(#coordinator{ring=Ring, conn_pool=Pools},
-             #transaction{timestamp=Ts, id=TxId, leaders=Leaders},
+             Tx=#transaction{timestamp=Ts, id=TxId, leaders=Leaders},
              Key,
              Value) ->
-    Idx={_, Node} = ext_ring:get_key_location(Ring, Key),
-    Pool = maps:get(Node, Pools),
+    Idx = ext_ring:get_key_location(Ring, Key),
+    Pool = maps:get(get_coord_node(Tx, Idx), Pools),
     {ok, ReqId} = ext_shackle_transport:update_request(Pool, maps:get(Idx, Leaders, empty), TxId, Ts, Key, Value),
     {ok, {update, ReqId, Idx}}.
 
@@ -232,7 +232,7 @@ await_update(_, Tx=#transaction{ballots=Ballots, leaders=Leaders}, {update, ReqI
             Tx1 = Tx#transaction{ballots=Ballots#{P => Ballot},
                                  leaders=Leaders#{Idx => ShardLeader}},
 
-            {ok, set_tx_init_node(Tx1, Node)}
+            {ok, confirm_coord_node(Tx1, Node)}
     end.
 
 -spec sync_read(t(), tx(), binary()) -> {ok, binary(), tx()} | error.
@@ -247,10 +247,10 @@ sync_update(Coord, Tx, Key, Value) ->
 
 -spec ping(t(), tx(), binary()) -> ok.
 ping(#coordinator{ring=Ring, conn_pool=Pools},
-    #transaction{id=TxId},
-    Key) ->
-    {_, Node} = ext_ring:get_key_location(Ring, Key),
-    Pool = maps:get(Node, Pools),
+     Tx=#transaction{id=TxId},
+     Key) ->
+    Idx = ext_ring:get_key_location(Ring, Key),
+    Pool = maps:get(get_coord_node(Tx, Idx), Pools),
     {ok, ReqId} = ext_shackle_transport:ping(Pool, TxId),
     shackle:receive_response(ReqId).
 
@@ -258,9 +258,16 @@ ping(#coordinator{ring=Ring, conn_pool=Pools},
 %% Internal functions
 %%====================================================================
 
--spec set_tx_init_node(tx(), node_and_port()) -> tx().
-set_tx_init_node(Tx=#transaction{init_node=undefined}, Node) -> Tx#transaction{init_node=Node};
-set_tx_init_node(Tx, _) -> Tx.
+-spec get_coord_node(tx(), index_node()) -> node_and_port().
+get_coord_node(#transaction{init_node=undefined}, {_, DefaultNode}) ->
+    DefaultNode;
+
+get_coord_node(#transaction{init_node=Node}, _) ->
+    Node.
+
+-spec confirm_coord_node(tx(), node_and_port()) -> tx().
+confirm_coord_node(Tx=#transaction{init_node=undefined}, Node) -> Tx#transaction{init_node=Node};
+confirm_coord_node(Tx, _) -> Tx.
 
 %%====================================================================
 %% Util functions
