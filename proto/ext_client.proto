@@ -2,87 +2,87 @@ syntax = "proto3";
 package client;
 
 message Load {
-  uint64 startKey = 1;
-  uint64 keyLimit = 2;
-  bytes value = 3;
+    uint64 startKey = 1;
+    uint64 keyLimit = 2;
+    bytes value = 3;
 }
 
 message LoadReply {}
 
 message Read {
-  // If empty, this is the first request at the partition
-  optional string prevLeader = 1;
-  string txId = 2;
-  uint64 timestamp = 3;
-  bytes key = 4;
+    // If empty, this is the first request at the partition
+    optional string prevLeader = 1;
+    string txId = 2;
+    uint64 timestamp = 3;
+    bytes key = 4;
 }
 
 message ReadReply {
-  uint32 ballot = 1;
-  string servedBy = 2;
-  bool isError = 3;
-  bytes data = 4;
-  // Only used between peers
-  optional string txId = 5;
+    uint32 ballot = 1;
+    string servedBy = 2;
+    bool isError = 3;
+    bytes data = 4;
+    // Only used between peers
+    optional string txId = 5;
 }
 
 message Update {
-  // If empty, this is the first request at the partition
-  optional string prevLeader = 1;
-  string txId = 2;
-  uint64 timestamp = 3;
-  bytes key = 4;
-  bytes data = 5;
+    // If empty, this is the first request at the partition
+    optional string prevLeader = 1;
+    string txId = 2;
+    uint64 timestamp = 3;
+    bytes key = 4;
+    bytes data = 5;
 }
 
 message UpdateReply {
-  uint32 ballot = 1;
-  string servedBy = 2;
-  bool isError = 3;
-  // Only used between peers
-  optional string txId = 4;
+    uint32 ballot = 1;
+    string servedBy = 2;
+    bool isError = 3;
+    // Only used between peers
+    optional string txId = 4;
 }
 
 message Commit {
-  string txId = 1;
-  map<uint32, uint32> ballots = 2;
-  uint64 timestamp = 3;
+    string txId = 1;
+    map<uint32, uint32> ballots = 2;
+    uint64 timestamp = 3;
 }
 
 message CommitReply {
-  bool commit = 1;
+    bool commit = 1;
 }
 
 message Release {
-  string txId = 1;
-  repeated uint32 partitions = 2;
+    string txId = 1;
+    repeated uint32 partitions = 2;
 }
 
 message ClientPing {
-  string txId = 1;
+    string txId = 1;
 }
 
 message ClientPong {}
 
 message Request {
-  uint32 seq = 1;
-  oneof payload {
-    Read read = 2;
-    Update update = 3;
-    Commit commit = 4;
-    Release release = 5;
-    Load load = 6;
-    ClientPing ping = 7;
-  }
+    uint32 seq = 1;
+    oneof payload {
+        Read read = 2;
+        Update update = 3;
+        Commit commit = 4;
+        Release release = 5;
+        Load load = 6;
+        ClientPing ping = 7;
+    }
 }
 
 message Response {
-  uint32 seq = 1;
-  oneof payload {
-    ReadReply read = 2;
-    UpdateReply update = 3;
-    CommitReply commit = 4;
-    LoadReply load = 5;
-    ClientPong pong = 6;
-  }
+    uint32 seq = 1;
+    oneof payload {
+        ReadReply read = 2;
+        UpdateReply update = 3;
+        CommitReply commit = 4;
+        LoadReply load = 5;
+        ClientPong pong = 6;
+    }
 }
