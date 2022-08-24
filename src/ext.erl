@@ -17,13 +17,14 @@
 
 %% Sync read / update API
 -export([sync_read/3,
-         sync_update/4]).
+         sync_update/4,
+         sync_operation/4]).
 
 %% Async read / update API
 -export([async_read/3,
          await_read/3,
-         async_update/4,
-         await_update/3]).
+         async_operation/4,
+         await_operation/3]).
 
 %% Commit / Release API
 -export([async_commit/3,
@@ -214,18 +215,18 @@ await_read(_, Tx=#transaction{ballots=Ballots, leaders=Leaders, partitions=Parti
             {ok, Value, confirm_coord_index_node(Tx1, Idx)}
     end.
 
--spec async_update(t(), tx(), binary(), binary()) -> {ok, update_req_id()}.
-async_update(#coordinator{ring=Ring, conn_pool=Pools},
-             Tx=#transaction{timestamp=Ts, id=TxId, leaders=Leaders},
-             Key,
-             Value) ->
+-spec async_operation(t(), tx(), binary(), operation()) -> {ok, update_req_id()}.
+async_operation(#coordinator{ring=Ring, conn_pool=Pools},
+                Tx=#transaction{timestamp=Ts, id=TxId, leaders=Leaders},
+                Key,
+                Operation) ->
     Idx = ext_ring:get_key_location(Ring, Key),
     Pool = maps:get(get_coord_node(Tx, Idx), Pools),
-    {ok, ReqId} = ext_shackle_transport:update_request(Pool, maps:get(Idx, Leaders, empty), TxId, Ts, Key, Value),
+    {ok, ReqId} = ext_shackle_transport:update_request(Pool, maps:get(Idx, Leaders, empty), TxId, Ts, Key, Operation),
     {ok, {update, ReqId, Idx}}.
 
--spec await_update(t(), tx(), update_req_id()) -> {ok, tx()} | {error, tx()}.
-await_update(_, Tx=#transaction{ballots=Ballots, leaders=Leaders, partitions=Partitions}, {update, ReqId, Idx={P, _}}) ->
+-spec await_operation(t(), tx(), update_req_id()) -> {ok, tx()} | {error, tx()}.
+await_operation(_, Tx=#transaction{ballots=Ballots, leaders=Leaders, partitions=Partitions}, {update, ReqId, Idx={P, _}}) ->
     Tx0 = Tx#transaction{partitions=Partitions#{Idx => []}},
     case shackle:receive_response(ReqId) of
         error ->
@@ -245,8 +246,12 @@ sync_read(Coord, Tx, Key) ->
 
 -spec sync_update(t(), tx(), binary(), binary()) -> {ok, tx()} | {error, tx()}.
 sync_update(Coord, Tx, Key, Value) ->
-    {ok, Req} = async_update(Coord, Tx, Key, Value),
-    await_update(Coord, Tx, Req).
+    sync_operation(Coord, Tx, Key, {data, Value}).
+
+-spec sync_operation(t(), tx(), binary(), operation()) -> {ok, tx()} | {error, tx()}.
+sync_operation(Coord, Tx, Key, Op) ->
+    {ok, Req} = async_operation(Coord, Tx, Key, Op),
+    await_operation(Coord, Tx, Req).
 
 -spec ping(t(), tx(), binary()) -> ok.
 ping(#coordinator{ring=Ring, conn_pool=Pools},

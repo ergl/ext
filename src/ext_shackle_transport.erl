@@ -43,11 +43,11 @@ read_request(Pool, PrevLeader, TxId, Timestamp, Key) ->
     TxId :: binary(),
     Timestamp :: timestamp(),
     Key :: binary(),
-    Value :: binary()
+    Operation :: operation()
 ) -> {ok, shackle:external_request_id()}.
 %% When awaited, returns {ok, Ballot :: ballot(), ServedBy :: replica_id()} | error.
-update_request(Pool, PrevLeader, TxId, Timestamp, Key, Value) ->
-    shackle:cast(Pool, {update, PrevLeader, TxId, Timestamp, Key, Value}, self(), infinity).
+update_request(Pool, PrevLeader, TxId, Timestamp, Key, Operation) ->
+    shackle:cast(Pool, {update, PrevLeader, TxId, Timestamp, Key, Operation}, self(), infinity).
 
 -spec commit_request(
     Pool :: shackle_pool(),
@@ -85,8 +85,8 @@ handle_request({read, PrevLeader, TxId, Timestamp, Key}, S=#state{req_counter=Re
     Msg = case PrevLeader of empty -> Msg0; _ -> Msg0#{prevLeader => PrevLeader} end,
     {ok, Req, make_request(Req, {read, Msg}), incr_req(S)};
 
-handle_request({update, PrevLeader, TxId, Timestamp, Key, Value}, S=#state{req_counter=Req}) ->
-    Msg0 = #{txId => TxId, timestamp => Timestamp, key => Key, data => Value},
+handle_request({update, PrevLeader, TxId, Timestamp, Key, Operation}, S=#state{req_counter=Req}) ->
+    Msg0 = #{txId => TxId, timestamp => Timestamp, key => Key, operation => Operation},
     Msg = case PrevLeader of empty -> Msg0; _ -> Msg0#{prevLeader => PrevLeader} end,
     {ok, Req, make_request(Req, {update, Msg}), incr_req(S)};
 

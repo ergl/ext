@@ -32,7 +32,22 @@ message Update {
     string txId = 2;
     uint64 timestamp = 3;
     bytes key = 4;
-    bytes data = 5;
+    oneof operation {
+        bytes data = 5;
+
+        // Signed operations
+        int32 signedIncr = 6;
+        int64 signedIncr64 = 7;
+        double floatIncr = 8;
+
+        // Unsigned add
+        uint32 unsignedIncr = 9;
+        uint64 unsignedIncr64 = 10;
+
+        // Unsigned decrement
+        uint32 unsignedDecr = 11;
+        uint64 unsignedDecr64 = 12;
+    }
 }
 
 message UpdateReply {

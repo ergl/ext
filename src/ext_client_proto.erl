@@ -48,7 +48,7 @@
         txId                    => unicode:chardata(), % = 2, optional
         timestamp               => non_neg_integer(), % = 3, optional, 64 bits
         key                     => iodata(),        % = 4, optional
-        data                    => iodata()         % = 5, optional
+        operation               => {data, iodata()} | {signedIncr, integer()} | {signedIncr64, integer()} | {floatIncr, float() | integer() | infinity | '-infinity' | nan} | {unsignedIncr, non_neg_integer()} | {unsignedIncr64, non_neg_integer()} | {unsignedDecr, non_neg_integer()} | {unsignedDecr64, non_neg_integer()} % oneof
        }.
 
 -type 'client.UpdateReply'() ::
@@ -301,13 +301,16 @@ encode_msg(Msg, MsgName, Opts) ->
              _ -> B3
          end,
     case M of
-        #{data := F5} ->
-            begin
-                TrF5 = id(F5, TrUserData),
-                case iolist_size(TrF5) of
-                    0 -> B4;
-                    _ -> e_type_bytes(TrF5, <<B4/binary, 42>>, TrUserData)
-                end
+        #{operation := F5} ->
+            case id(F5, TrUserData) of
+                {data, TF5} -> begin TrTF5 = id(TF5, TrUserData), e_type_bytes(TrTF5, <<B4/binary, 42>>, TrUserData) end;
+                {signedIncr, TF5} -> begin TrTF5 = id(TF5, TrUserData), e_type_int32(TrTF5, <<B4/binary, 48>>, TrUserData) end;
+                {signedIncr64, TF5} -> begin TrTF5 = id(TF5, TrUserData), e_type_int64(TrTF5, <<B4/binary, 56>>, TrUserData) end;
+                {floatIncr, TF5} -> begin TrTF5 = id(TF5, TrUserData), e_type_double(TrTF5, <<B4/binary, 65>>, TrUserData) end;
+                {unsignedIncr, TF5} -> begin TrTF5 = id(TF5, TrUserData), e_varint(TrTF5, <<B4/binary, 72>>, TrUserData) end;
+                {unsignedIncr64, TF5} -> begin TrTF5 = id(TF5, TrUserData), e_varint(TrTF5, <<B4/binary, 80>>, TrUserData) end;
+                {unsignedDecr, TF5} -> begin TrTF5 = id(TF5, TrUserData), e_varint(TrTF5, <<B4/binary, 88>>, TrUserData) end;
+                {unsignedDecr64, TF5} -> begin TrTF5 = id(TF5, TrUserData), e_varint(TrTF5, <<B4/binary, 96>>, TrUserData) end
             end;
         _ -> B4
     end.
@@ -981,17 +984,27 @@ decode_msg_2_doit('client.Response', Bin, TrUserData) -> id('decode_msg_client.R
 
 'skip_64_client.ReadReply'(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> 'dfp_read_field_def_client.ReadReply'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData).
 
-'decode_msg_client.Update'(Bin, TrUserData) -> 'dfp_read_field_def_client.Update'(Bin, 0, 0, 0, id('$undef', TrUserData), id(<<>>, TrUserData), id(0, TrUserData), id(<<>>, TrUserData), id(<<>>, TrUserData), TrUserData).
+'decode_msg_client.Update'(Bin, TrUserData) -> 'dfp_read_field_def_client.Update'(Bin, 0, 0, 0, id('$undef', TrUserData), id(<<>>, TrUserData), id(0, TrUserData), id(<<>>, TrUserData), id('$undef', TrUserData), TrUserData).
 
 'dfp_read_field_def_client.Update'(<<10, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> 'd_field_client.Update_prevLeader'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
 'dfp_read_field_def_client.Update'(<<18, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> 'd_field_client.Update_txId'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
 'dfp_read_field_def_client.Update'(<<24, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> 'd_field_client.Update_timestamp'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
 'dfp_read_field_def_client.Update'(<<34, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> 'd_field_client.Update_key'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
 'dfp_read_field_def_client.Update'(<<42, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> 'd_field_client.Update_data'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+'dfp_read_field_def_client.Update'(<<48, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> 'd_field_client.Update_signedIncr'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+'dfp_read_field_def_client.Update'(<<56, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> 'd_field_client.Update_signedIncr64'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+'dfp_read_field_def_client.Update'(<<65, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> 'd_field_client.Update_floatIncr'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+'dfp_read_field_def_client.Update'(<<72, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> 'd_field_client.Update_unsignedIncr'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+'dfp_read_field_def_client.Update'(<<80, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> 'd_field_client.Update_unsignedIncr64'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+'dfp_read_field_def_client.Update'(<<88, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> 'd_field_client.Update_unsignedDecr'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+'dfp_read_field_def_client.Update'(<<96, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> 'd_field_client.Update_unsignedDecr64'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
 'dfp_read_field_def_client.Update'(<<>>, 0, 0, _, F@_1, F@_2, F@_3, F@_4, F@_5, _) ->
-    S1 = #{txId => F@_2, timestamp => F@_3, key => F@_4, data => F@_5},
-    if F@_1 == '$undef' -> S1;
-       true -> S1#{prevLeader => F@_1}
+    S1 = #{txId => F@_2, timestamp => F@_3, key => F@_4},
+    S2 = if F@_1 == '$undef' -> S1;
+            true -> S1#{prevLeader => F@_1}
+         end,
+    if F@_5 == '$undef' -> S2;
+       true -> S2#{operation => F@_5}
     end;
 'dfp_read_field_def_client.Update'(Other, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> 'dg_read_field_def_client.Update'(Other, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData).
 
@@ -1004,6 +1017,13 @@ decode_msg_2_doit('client.Response', Bin, TrUserData) -> id('decode_msg_client.R
         24 -> 'd_field_client.Update_timestamp'(Rest, 0, 0, 0, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
         34 -> 'd_field_client.Update_key'(Rest, 0, 0, 0, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
         42 -> 'd_field_client.Update_data'(Rest, 0, 0, 0, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+        48 -> 'd_field_client.Update_signedIncr'(Rest, 0, 0, 0, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+        56 -> 'd_field_client.Update_signedIncr64'(Rest, 0, 0, 0, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+        65 -> 'd_field_client.Update_floatIncr'(Rest, 0, 0, 0, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+        72 -> 'd_field_client.Update_unsignedIncr'(Rest, 0, 0, 0, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+        80 -> 'd_field_client.Update_unsignedIncr64'(Rest, 0, 0, 0, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+        88 -> 'd_field_client.Update_unsignedDecr'(Rest, 0, 0, 0, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+        96 -> 'd_field_client.Update_unsignedDecr64'(Rest, 0, 0, 0, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
         _ ->
             case Key band 7 of
                 0 -> 'skip_varint_client.Update'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
@@ -1014,9 +1034,12 @@ decode_msg_2_doit('client.Response', Bin, TrUserData) -> id('decode_msg_client.R
             end
     end;
 'dg_read_field_def_client.Update'(<<>>, 0, 0, _, F@_1, F@_2, F@_3, F@_4, F@_5, _) ->
-    S1 = #{txId => F@_2, timestamp => F@_3, key => F@_4, data => F@_5},
-    if F@_1 == '$undef' -> S1;
-       true -> S1#{prevLeader => F@_1}
+    S1 = #{txId => F@_2, timestamp => F@_3, key => F@_4},
+    S2 = if F@_1 == '$undef' -> S1;
+            true -> S1#{prevLeader => F@_1}
+         end,
+    if F@_5 == '$undef' -> S2;
+       true -> S2#{operation => F@_5}
     end.
 
 'd_field_client.Update_prevLeader'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 -> 'd_field_client.Update_prevLeader'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
@@ -1042,7 +1065,46 @@ decode_msg_2_doit('client.Response', Bin, TrUserData) -> id('decode_msg_client.R
 'd_field_client.Update_data'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 -> 'd_field_client.Update_data'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
 'd_field_client.Update_data'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, _, TrUserData) ->
     {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bytes:Len/binary, Rest2/binary>> = Rest, Bytes2 = binary:copy(Bytes), {id(Bytes2, TrUserData), Rest2} end,
-    'dfp_read_field_def_client.Update'(RestF, 0, 0, F, F@_1, F@_2, F@_3, F@_4, NewFValue, TrUserData).
+    'dfp_read_field_def_client.Update'(RestF, 0, 0, F, F@_1, F@_2, F@_3, F@_4, id({data, NewFValue}, TrUserData), TrUserData).
+
+'d_field_client.Update_signedIncr'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 -> 'd_field_client.Update_signedIncr'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+'d_field_client.Update_signedIncr'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, _, TrUserData) ->
+    {NewFValue, RestF} = {begin <<Res:32/signed-native>> = <<(X bsl N + Acc):32/unsigned-native>>, id(Res, TrUserData) end, Rest},
+    'dfp_read_field_def_client.Update'(RestF, 0, 0, F, F@_1, F@_2, F@_3, F@_4, id({signedIncr, NewFValue}, TrUserData), TrUserData).
+
+'d_field_client.Update_signedIncr64'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 -> 'd_field_client.Update_signedIncr64'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+'d_field_client.Update_signedIncr64'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, _, TrUserData) ->
+    {NewFValue, RestF} = {begin <<Res:64/signed-native>> = <<(X bsl N + Acc):64/unsigned-native>>, id(Res, TrUserData) end, Rest},
+    'dfp_read_field_def_client.Update'(RestF, 0, 0, F, F@_1, F@_2, F@_3, F@_4, id({signedIncr64, NewFValue}, TrUserData), TrUserData).
+
+'d_field_client.Update_floatIncr'(<<0:48, 240, 127, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, _, TrUserData) ->
+    'dfp_read_field_def_client.Update'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, id({floatIncr, id(infinity, TrUserData)}, TrUserData), TrUserData);
+'d_field_client.Update_floatIncr'(<<0:48, 240, 255, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, _, TrUserData) ->
+    'dfp_read_field_def_client.Update'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, id({floatIncr, id('-infinity', TrUserData)}, TrUserData), TrUserData);
+'d_field_client.Update_floatIncr'(<<_:48, 15:4, _:4, _:1, 127:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, _, TrUserData) ->
+    'dfp_read_field_def_client.Update'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, id({floatIncr, id(nan, TrUserData)}, TrUserData), TrUserData);
+'d_field_client.Update_floatIncr'(<<Value:64/little-float, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, _, TrUserData) ->
+    'dfp_read_field_def_client.Update'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, id({floatIncr, id(Value, TrUserData)}, TrUserData), TrUserData).
+
+'d_field_client.Update_unsignedIncr'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 -> 'd_field_client.Update_unsignedIncr'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+'d_field_client.Update_unsignedIncr'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, _, TrUserData) ->
+    {NewFValue, RestF} = {id((X bsl N + Acc) band 4294967295, TrUserData), Rest},
+    'dfp_read_field_def_client.Update'(RestF, 0, 0, F, F@_1, F@_2, F@_3, F@_4, id({unsignedIncr, NewFValue}, TrUserData), TrUserData).
+
+'d_field_client.Update_unsignedIncr64'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 -> 'd_field_client.Update_unsignedIncr64'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+'d_field_client.Update_unsignedIncr64'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, _, TrUserData) ->
+    {NewFValue, RestF} = {id((X bsl N + Acc) band 18446744073709551615, TrUserData), Rest},
+    'dfp_read_field_def_client.Update'(RestF, 0, 0, F, F@_1, F@_2, F@_3, F@_4, id({unsignedIncr64, NewFValue}, TrUserData), TrUserData).
+
+'d_field_client.Update_unsignedDecr'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 -> 'd_field_client.Update_unsignedDecr'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+'d_field_client.Update_unsignedDecr'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, _, TrUserData) ->
+    {NewFValue, RestF} = {id((X bsl N + Acc) band 4294967295, TrUserData), Rest},
+    'dfp_read_field_def_client.Update'(RestF, 0, 0, F, F@_1, F@_2, F@_3, F@_4, id({unsignedDecr, NewFValue}, TrUserData), TrUserData).
+
+'d_field_client.Update_unsignedDecr64'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 -> 'd_field_client.Update_unsignedDecr64'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+'d_field_client.Update_unsignedDecr64'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, _, TrUserData) ->
+    {NewFValue, RestF} = {id((X bsl N + Acc) band 18446744073709551615, TrUserData), Rest},
+    'dfp_read_field_def_client.Update'(RestF, 0, 0, F, F@_1, F@_2, F@_3, F@_4, id({unsignedDecr64, NewFValue}, TrUserData), TrUserData).
 
 'skip_varint_client.Update'(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> 'skip_varint_client.Update'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
 'skip_varint_client.Update'(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> 'dfp_read_field_def_client.Update'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData).
@@ -1906,8 +1968,8 @@ merge_msgs(Prev, New, MsgName, Opts) ->
              _ -> S4
          end,
     case {PMsg, NMsg} of
-        {_, #{data := NFdata}} -> S5#{data => NFdata};
-        {#{data := PFdata}, _} -> S5#{data => PFdata};
+        {_, #{operation := NFoperation}} -> S5#{operation => NFoperation};
+        {#{operation := PFoperation}, _} -> S5#{operation => PFoperation};
         _ -> S5
     end.
 
@@ -2176,14 +2238,22 @@ verify_msg(Msg, MsgName, Opts) ->
         _ -> ok
     end,
     case M of
-        #{data := F5} -> v_type_bytes(F5, [data | Path], TrUserData);
+        #{operation := {data, OF5}} -> v_type_bytes(OF5, [data, operation | Path], TrUserData);
+        #{operation := {signedIncr, OF5}} -> v_type_int32(OF5, [signedIncr, operation | Path], TrUserData);
+        #{operation := {signedIncr64, OF5}} -> v_type_int64(OF5, [signedIncr64, operation | Path], TrUserData);
+        #{operation := {floatIncr, OF5}} -> v_type_double(OF5, [floatIncr, operation | Path], TrUserData);
+        #{operation := {unsignedIncr, OF5}} -> v_type_uint32(OF5, [unsignedIncr, operation | Path], TrUserData);
+        #{operation := {unsignedIncr64, OF5}} -> v_type_uint64(OF5, [unsignedIncr64, operation | Path], TrUserData);
+        #{operation := {unsignedDecr, OF5}} -> v_type_uint32(OF5, [unsignedDecr, operation | Path], TrUserData);
+        #{operation := {unsignedDecr64, OF5}} -> v_type_uint64(OF5, [unsignedDecr64, operation | Path], TrUserData);
+        #{operation := F5} -> mk_type_error(invalid_oneof, F5, [operation | Path]);
         _ -> ok
     end,
     lists:foreach(fun (prevLeader) -> ok;
                       (txId) -> ok;
                       (timestamp) -> ok;
                       (key) -> ok;
-                      (data) -> ok;
+                      (operation) -> ok;
                       (OtherKey) -> mk_type_error({extraneous_key, OtherKey}, M, Path)
                   end,
                   maps:keys(M)),
@@ -2365,6 +2435,18 @@ verify_msg(Msg, MsgName, Opts) ->
 'v_msg_client.Response'(M, Path, _TrUserData) when is_map(M) -> mk_type_error({missing_fields, [] -- maps:keys(M), 'client.Response'}, M, Path);
 'v_msg_client.Response'(X, Path, _TrUserData) -> mk_type_error({expected_msg, 'client.Response'}, X, Path).
 
+-compile({nowarn_unused_function,v_type_int32/3}).
+-dialyzer({nowarn_function,v_type_int32/3}).
+v_type_int32(N, _Path, _TrUserData) when -2147483648 =< N, N =< 2147483647 -> ok;
+v_type_int32(N, Path, _TrUserData) when is_integer(N) -> mk_type_error({value_out_of_range, int32, signed, 32}, N, Path);
+v_type_int32(X, Path, _TrUserData) -> mk_type_error({bad_integer, int32, signed, 32}, X, Path).
+
+-compile({nowarn_unused_function,v_type_int64/3}).
+-dialyzer({nowarn_function,v_type_int64/3}).
+v_type_int64(N, _Path, _TrUserData) when -9223372036854775808 =< N, N =< 9223372036854775807 -> ok;
+v_type_int64(N, Path, _TrUserData) when is_integer(N) -> mk_type_error({value_out_of_range, int64, signed, 64}, N, Path);
+v_type_int64(X, Path, _TrUserData) -> mk_type_error({bad_integer, int64, signed, 64}, X, Path).
+
 -compile({nowarn_unused_function,v_type_uint32/3}).
 -dialyzer({nowarn_function,v_type_uint32/3}).
 v_type_uint32(N, _Path, _TrUserData) when 0 =< N, N =< 4294967295 -> ok;
@@ -2384,6 +2466,15 @@ v_type_bool(true, _Path, _TrUserData) -> ok;
 v_type_bool(0, _Path, _TrUserData) -> ok;
 v_type_bool(1, _Path, _TrUserData) -> ok;
 v_type_bool(X, Path, _TrUserData) -> mk_type_error(bad_boolean_value, X, Path).
+
+-compile({nowarn_unused_function,v_type_double/3}).
+-dialyzer({nowarn_function,v_type_double/3}).
+v_type_double(N, _Path, _TrUserData) when is_float(N) -> ok;
+v_type_double(N, _Path, _TrUserData) when is_integer(N) -> ok;
+v_type_double(infinity, _Path, _TrUserData) -> ok;
+v_type_double('-infinity', _Path, _TrUserData) -> ok;
+v_type_double(nan, _Path, _TrUserData) -> ok;
+v_type_double(X, Path, _TrUserData) -> mk_type_error(bad_double_value, X, Path).
 
 -compile({nowarn_unused_function,v_type_string/3}).
 -dialyzer({nowarn_function,v_type_string/3}).
