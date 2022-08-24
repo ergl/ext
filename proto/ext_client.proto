@@ -47,6 +47,11 @@ message Commit {
     string txId = 1;
     map<uint32, uint32> ballots = 2;
     uint64 timestamp = 3;
+    // Only used in Spanner.
+    // Client has no knowledge of the commit protocol to be
+    // used, so this field is not marked as optional. From
+    // their point of view, this is superfluous information.
+    uint32 coordPartition = 4;
 }
 
 message CommitReply {

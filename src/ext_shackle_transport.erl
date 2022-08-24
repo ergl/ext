@@ -4,7 +4,7 @@
 
 -export([read_request/5,
          update_request/6,
-         commit_request/5,
+         commit_request/6,
          release/3]).
 
 -export([ping/2]).
@@ -52,13 +52,14 @@ update_request(Pool, PrevLeader, TxId, Timestamp, Key, Value) ->
 -spec commit_request(
     Pool :: shackle_pool(),
     TxId :: binary(),
+    CoordPartition :: partition_id(),
     Timestamp :: timestamp(),
     Ballots :: #{partition_id() => ballot()},
     Timeout :: timeout()
 ) -> {ok, shackle:external_request_id()}.
 %% When awaited, returns ok | error.
-commit_request(Pool, TxId, Timestamp, Ballots, Timeout) ->
-    shackle:cast(Pool, {commit, TxId, Timestamp, Ballots}, self(), Timeout).
+commit_request(Pool, TxId, CoordPartition, Timestamp, Ballots, Timeout) ->
+    shackle:cast(Pool, {commit, TxId, CoordPartition, Timestamp, Ballots}, self(), Timeout).
 
 -spec release(shackle_pool(), binary(), [partition_id()]) -> ok.
 release(Pool, TxId, Partitions) ->
@@ -89,8 +90,8 @@ handle_request({update, PrevLeader, TxId, Timestamp, Key, Value}, S=#state{req_c
     Msg = case PrevLeader of empty -> Msg0; _ -> Msg0#{prevLeader => PrevLeader} end,
     {ok, Req, make_request(Req, {update, Msg}), incr_req(S)};
 
-handle_request({commit, TxId, Timestamp, Ballots}, S=#state{req_counter=Req}) ->
-    Msg = #{txId => TxId, timestamp => Timestamp, ballots => Ballots},
+handle_request({commit, TxId, CoordPartition, Timestamp, Ballots}, S=#state{req_counter=Req}) ->
+    Msg = #{txId => TxId, timestamp => Timestamp, ballots => Ballots, coordPartition => CoordPartition},
     {ok, Req, make_request(Req, {commit, Msg}), incr_req(S)};
 
 handle_request({release, TxId, Partitions}, S=#state{req_counter=Req}) ->

@@ -50,7 +50,7 @@
 -record(transaction, {
     id :: binary(),
     timestamp :: timestamp(),
-    init_node = undefined :: undefined | node_and_port(),
+    init_index_node = undefined :: undefined | index_node(),
 
     ballots = #{} :: #{partition_id() => ballot()},
     leaders = #{} :: #{index_node() => replica_id()},
@@ -142,15 +142,15 @@ start_transaction(#coordinator{tx_id_prefix=Prefix}, Id) ->
                       timestamp=erlang:system_time(nanosecond)}}.
 
 -spec async_commit(t(), tx(), timeout()) -> {ok, commit_req_id()}.
-async_commit(_, #transaction{init_node=undefined}, _) ->
+async_commit(_, #transaction{init_index_node=undefined}, _) ->
     %% If the transaction never read anything, we bypass 2PC
     {ok, empty_commit};
 
 async_commit(#coordinator{conn_pool=Pools},
-             #transaction{id=TxId, init_node=Idx, timestamp=Ts, ballots=Ballots},
+             #transaction{id=TxId, init_index_node={CoordPartition, Idx}, timestamp=Ts, ballots=Ballots},
              Timeout) ->
     Pool = maps:get(Idx, Pools),
-    {ok, ReqId} = ext_shackle_transport:commit_request(Pool, TxId, Ts, Ballots, Timeout),
+    {ok, ReqId} = ext_shackle_transport:commit_request(Pool, TxId, CoordPartition, Ts, Ballots, Timeout),
     {ok, {commit, ReqId}}.
 
 -spec await_commit(t(), commit_req_id()) -> ok | error.
@@ -173,10 +173,10 @@ commit(Coord, Tx) ->
     commit(Coord, Tx, infinity).
 
 -spec commit_at(t(), tx(), index_node()) -> ok | error.
-commit_at(_, #transaction{init_node=undefined}, _) ->
+commit_at(_, #transaction{init_index_node=undefined}, _) ->
     ok;
-commit_at(Coord, Tx, {_, Idx}) ->
-    commit(Coord, Tx#transaction{init_node = Idx}, infinity).
+commit_at(Coord, Tx, IndexNode) ->
+    commit(Coord, Tx#transaction{init_index_node = IndexNode}, infinity).
 
 -spec commit(t(), tx(), timeout()) -> ok | error.
 commit(Coord, Tx, Timeout) ->
@@ -184,10 +184,10 @@ commit(Coord, Tx, Timeout) ->
     await_commit(Coord, Req).
 
 -spec release(t(), tx()) -> ok.
-release(_, #transaction{init_node=undefined}) ->
+release(_, #transaction{init_index_node=undefined}) ->
     %% If the transaction never read anything, return
     ok;
-release(#coordinator{conn_pool=Pools}, #transaction{id=TxId, init_node=Idx, partitions=Partitions}) ->
+release(#coordinator{conn_pool=Pools}, #transaction{id=TxId, init_index_node={_, Idx}, partitions=Partitions}) ->
     PartitionList = [ Partition || {Partition, _} <- maps:keys(Partitions) ],
     ext_shackle_transport:release(maps:get(Idx, Pools), TxId, PartitionList).
 
@@ -201,7 +201,7 @@ async_read(#coordinator{ring=Ring, conn_pool=Pools},
     {ok, {read, ReqId, Idx}}.
 
 -spec await_read(t(), tx(), read_req_id()) -> {ok, binary(), tx()} | {error, tx()}.
-await_read(_, Tx=#transaction{ballots=Ballots, leaders=Leaders, partitions=Partitions}, {read, ReqId, Idx={P, Node}}) ->
+await_read(_, Tx=#transaction{ballots=Ballots, leaders=Leaders, partitions=Partitions}, {read, ReqId, Idx={P, _}}) ->
     Tx0 = Tx#transaction{partitions=Partitions#{Idx => []}},
     case shackle:receive_response(ReqId) of
         error ->
@@ -211,7 +211,7 @@ await_read(_, Tx=#transaction{ballots=Ballots, leaders=Leaders, partitions=Parti
             Tx1 = Tx0#transaction{ballots=Ballots#{P => Ballot},
                                   leaders=Leaders#{Idx => ShardLeader}},
 
-            {ok, Value, confirm_coord_node(Tx1, Node)}
+            {ok, Value, confirm_coord_index_node(Tx1, Idx)}
     end.
 
 -spec async_update(t(), tx(), binary(), binary()) -> {ok, update_req_id()}.
@@ -225,7 +225,7 @@ async_update(#coordinator{ring=Ring, conn_pool=Pools},
     {ok, {update, ReqId, Idx}}.
 
 -spec await_update(t(), tx(), update_req_id()) -> {ok, tx()} | {error, tx()}.
-await_update(_, Tx=#transaction{ballots=Ballots, leaders=Leaders, partitions=Partitions}, {update, ReqId, Idx={P, Node}}) ->
+await_update(_, Tx=#transaction{ballots=Ballots, leaders=Leaders, partitions=Partitions}, {update, ReqId, Idx={P, _}}) ->
     Tx0 = Tx#transaction{partitions=Partitions#{Idx => []}},
     case shackle:receive_response(ReqId) of
         error ->
@@ -235,7 +235,7 @@ await_update(_, Tx=#transaction{ballots=Ballots, leaders=Leaders, partitions=Par
             Tx1 = Tx0#transaction{ballots=Ballots#{P => Ballot},
                                   leaders=Leaders#{Idx => ShardLeader}},
 
-            {ok, confirm_coord_node(Tx1, Node)}
+            {ok, confirm_coord_index_node(Tx1, Idx)}
     end.
 
 -spec sync_read(t(), tx(), binary()) -> {ok, binary(), tx()} | {error, tx()}.
@@ -262,15 +262,15 @@ ping(#coordinator{ring=Ring, conn_pool=Pools},
 %%====================================================================
 
 -spec get_coord_node(tx(), index_node()) -> node_and_port().
-get_coord_node(#transaction{init_node=undefined}, {_, DefaultNode}) ->
+get_coord_node(#transaction{init_index_node=undefined}, {_, DefaultNode}) ->
     DefaultNode;
 
-get_coord_node(#transaction{init_node=Node}, _) ->
+get_coord_node(#transaction{init_index_node={_, Node}}, _) ->
     Node.
 
--spec confirm_coord_node(tx(), node_and_port()) -> tx().
-confirm_coord_node(Tx=#transaction{init_node=undefined}, Node) -> Tx#transaction{init_node=Node};
-confirm_coord_node(Tx, _) -> Tx.
+-spec confirm_coord_index_node(tx(), index_node()) -> tx().
+confirm_coord_index_node(Tx=#transaction{init_index_node=undefined}, IdxNode) -> Tx#transaction{init_index_node=IdxNode};
+confirm_coord_index_node(Tx, _) -> Tx.
 
 %%====================================================================
 %% Util functions
