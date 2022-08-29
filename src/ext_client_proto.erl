@@ -43,6 +43,27 @@
         txId                    => unicode:chardata() % = 5, optional
        }.
 
+-type 'client.ReadBatch.Piece'() ::
+      #{prevLeader              => unicode:chardata(), % = 1, optional
+        keys                    => [iodata()]       % = 2, repeated
+       }.
+
+-type 'client.ReadBatch'() ::
+      #{txId                    => unicode:chardata(), % = 1, optional
+        timestamp               => non_neg_integer(), % = 2, optional, 64 bits
+        pieces                  => #{non_neg_integer() => 'client.ReadBatch.Piece'()} % = 4
+       }.
+
+-type 'client.ReadBatchReply.Piece'() ::
+      #{ballot                  => non_neg_integer(), % = 1, optional, 32 bits
+        servedBy                => unicode:chardata(), % = 2, optional
+        values                  => [iodata()]       % = 3, repeated
+       }.
+
+-type 'client.ReadBatchReply'() ::
+      #{payload                 => #{non_neg_integer() => 'client.ReadBatchReply.Piece'()} % = 1
+       }.
+
 -type 'client.Update'() ::
       #{prevLeader              => unicode:chardata(), % = 1, optional
         txId                    => unicode:chardata(), % = 2, optional
@@ -84,17 +105,17 @@
 
 -type 'client.Request'() ::
       #{seq                     => non_neg_integer(), % = 1, optional, 32 bits
-        payload                 => {read, 'client.Read'()} | {update, 'client.Update'()} | {commit, 'client.Commit'()} | {release, 'client.Release'()} | {load, 'client.Load'()} | {ping, 'client.ClientPing'()} % oneof
+        payload                 => {read, 'client.Read'()} | {update, 'client.Update'()} | {commit, 'client.Commit'()} | {release, 'client.Release'()} | {load, 'client.Load'()} | {ping, 'client.ClientPing'()} | {readBatch, 'client.ReadBatch'()} % oneof
        }.
 
 -type 'client.Response'() ::
       #{seq                     => non_neg_integer(), % = 1, optional, 32 bits
-        payload                 => {read, 'client.ReadReply'()} | {update, 'client.UpdateReply'()} | {commit, 'client.CommitReply'()} | {load, 'client.LoadReply'()} | {pong, 'client.ClientPong'()} % oneof
+        payload                 => {read, 'client.ReadReply'()} | {update, 'client.UpdateReply'()} | {commit, 'client.CommitReply'()} | {load, 'client.LoadReply'()} | {pong, 'client.ClientPong'()} | {readBatch, 'client.ReadBatchReply'()} % oneof
        }.
 
--export_type(['client.Load'/0, 'client.LoadReply'/0, 'client.Read'/0, 'client.ReadReply'/0, 'client.Update'/0, 'client.UpdateReply'/0, 'client.Commit'/0, 'client.CommitReply'/0, 'client.Release'/0, 'client.ClientPing'/0, 'client.ClientPong'/0, 'client.Request'/0, 'client.Response'/0]).
--type '$msg_name'() :: 'client.Load' | 'client.LoadReply' | 'client.Read' | 'client.ReadReply' | 'client.Update' | 'client.UpdateReply' | 'client.Commit' | 'client.CommitReply' | 'client.Release' | 'client.ClientPing' | 'client.ClientPong' | 'client.Request' | 'client.Response'.
--type '$msg'() :: 'client.Load'() | 'client.LoadReply'() | 'client.Read'() | 'client.ReadReply'() | 'client.Update'() | 'client.UpdateReply'() | 'client.Commit'() | 'client.CommitReply'() | 'client.Release'() | 'client.ClientPing'() | 'client.ClientPong'() | 'client.Request'() | 'client.Response'().
+-export_type(['client.Load'/0, 'client.LoadReply'/0, 'client.Read'/0, 'client.ReadReply'/0, 'client.ReadBatch.Piece'/0, 'client.ReadBatch'/0, 'client.ReadBatchReply.Piece'/0, 'client.ReadBatchReply'/0, 'client.Update'/0, 'client.UpdateReply'/0, 'client.Commit'/0, 'client.CommitReply'/0, 'client.Release'/0, 'client.ClientPing'/0, 'client.ClientPong'/0, 'client.Request'/0, 'client.Response'/0]).
+-type '$msg_name'() :: 'client.Load' | 'client.LoadReply' | 'client.Read' | 'client.ReadReply' | 'client.ReadBatch.Piece' | 'client.ReadBatch' | 'client.ReadBatchReply.Piece' | 'client.ReadBatchReply' | 'client.Update' | 'client.UpdateReply' | 'client.Commit' | 'client.CommitReply' | 'client.Release' | 'client.ClientPing' | 'client.ClientPong' | 'client.Request' | 'client.Response'.
+-type '$msg'() :: 'client.Load'() | 'client.LoadReply'() | 'client.Read'() | 'client.ReadReply'() | 'client.ReadBatch.Piece'() | 'client.ReadBatch'() | 'client.ReadBatchReply.Piece'() | 'client.ReadBatchReply'() | 'client.Update'() | 'client.UpdateReply'() | 'client.Commit'() | 'client.CommitReply'() | 'client.Release'() | 'client.ClientPing'() | 'client.ClientPong'() | 'client.Request'() | 'client.Response'().
 -export_type(['$msg_name'/0, '$msg'/0]).
 
 -if(?OTP_RELEASE >= 24).
@@ -118,6 +139,10 @@ encode_msg(Msg, MsgName, Opts) ->
         'client.LoadReply' -> 'encode_msg_client.LoadReply'(id(Msg, TrUserData), TrUserData);
         'client.Read' -> 'encode_msg_client.Read'(id(Msg, TrUserData), TrUserData);
         'client.ReadReply' -> 'encode_msg_client.ReadReply'(id(Msg, TrUserData), TrUserData);
+        'client.ReadBatch.Piece' -> 'encode_msg_client.ReadBatch.Piece'(id(Msg, TrUserData), TrUserData);
+        'client.ReadBatch' -> 'encode_msg_client.ReadBatch'(id(Msg, TrUserData), TrUserData);
+        'client.ReadBatchReply.Piece' -> 'encode_msg_client.ReadBatchReply.Piece'(id(Msg, TrUserData), TrUserData);
+        'client.ReadBatchReply' -> 'encode_msg_client.ReadBatchReply'(id(Msg, TrUserData), TrUserData);
         'client.Update' -> 'encode_msg_client.Update'(id(Msg, TrUserData), TrUserData);
         'client.UpdateReply' -> 'encode_msg_client.UpdateReply'(id(Msg, TrUserData), TrUserData);
         'client.Commit' -> 'encode_msg_client.Commit'(id(Msg, TrUserData), TrUserData);
@@ -258,6 +283,104 @@ encode_msg(Msg, MsgName, Opts) ->
     case M of
         #{txId := F5} -> begin TrF5 = id(F5, TrUserData), e_type_string(TrF5, <<B4/binary, 42>>, TrUserData) end;
         _ -> B4
+    end.
+
+'encode_msg_client.ReadBatch.Piece'(Msg, TrUserData) -> 'encode_msg_client.ReadBatch.Piece'(Msg, <<>>, TrUserData).
+
+
+'encode_msg_client.ReadBatch.Piece'(#{} = M, Bin, TrUserData) ->
+    B1 = case M of
+             #{prevLeader := F1} -> begin TrF1 = id(F1, TrUserData), e_type_string(TrF1, <<Bin/binary, 10>>, TrUserData) end;
+             _ -> Bin
+         end,
+    case M of
+        #{keys := F2} ->
+            TrF2 = id(F2, TrUserData),
+            if TrF2 == [] -> B1;
+               true -> 'e_field_client.ReadBatch.Piece_keys'(TrF2, B1, TrUserData)
+            end;
+        _ -> B1
+    end.
+
+'encode_msg_client.ReadBatch'(Msg, TrUserData) -> 'encode_msg_client.ReadBatch'(Msg, <<>>, TrUserData).
+
+
+'encode_msg_client.ReadBatch'(#{} = M, Bin, TrUserData) ->
+    B1 = case M of
+             #{txId := F1} ->
+                 begin
+                     TrF1 = id(F1, TrUserData),
+                     case is_empty_string(TrF1) of
+                         true -> Bin;
+                         false -> e_type_string(TrF1, <<Bin/binary, 10>>, TrUserData)
+                     end
+                 end;
+             _ -> Bin
+         end,
+    B2 = case M of
+             #{timestamp := F2} ->
+                 begin
+                     TrF2 = id(F2, TrUserData),
+                     if TrF2 =:= 0 -> B1;
+                        true -> e_varint(TrF2, <<B1/binary, 16>>, TrUserData)
+                     end
+                 end;
+             _ -> B1
+         end,
+    case M of
+        #{pieces := F3} ->
+            TrF3 = 'tr_encode_client.ReadBatch.pieces'(F3, TrUserData),
+            if TrF3 == [] -> B2;
+               true -> 'e_field_client.ReadBatch_pieces'(TrF3, B2, TrUserData)
+            end;
+        _ -> B2
+    end.
+
+'encode_msg_client.ReadBatchReply.Piece'(Msg, TrUserData) -> 'encode_msg_client.ReadBatchReply.Piece'(Msg, <<>>, TrUserData).
+
+
+'encode_msg_client.ReadBatchReply.Piece'(#{} = M, Bin, TrUserData) ->
+    B1 = case M of
+             #{ballot := F1} ->
+                 begin
+                     TrF1 = id(F1, TrUserData),
+                     if TrF1 =:= 0 -> Bin;
+                        true -> e_varint(TrF1, <<Bin/binary, 8>>, TrUserData)
+                     end
+                 end;
+             _ -> Bin
+         end,
+    B2 = case M of
+             #{servedBy := F2} ->
+                 begin
+                     TrF2 = id(F2, TrUserData),
+                     case is_empty_string(TrF2) of
+                         true -> B1;
+                         false -> e_type_string(TrF2, <<B1/binary, 18>>, TrUserData)
+                     end
+                 end;
+             _ -> B1
+         end,
+    case M of
+        #{values := F3} ->
+            TrF3 = id(F3, TrUserData),
+            if TrF3 == [] -> B2;
+               true -> 'e_field_client.ReadBatchReply.Piece_values'(TrF3, B2, TrUserData)
+            end;
+        _ -> B2
+    end.
+
+'encode_msg_client.ReadBatchReply'(Msg, TrUserData) -> 'encode_msg_client.ReadBatchReply'(Msg, <<>>, TrUserData).
+
+
+'encode_msg_client.ReadBatchReply'(#{} = M, Bin, TrUserData) ->
+    case M of
+        #{payload := F1} ->
+            TrF1 = 'tr_encode_client.ReadBatchReply.payload'(F1, TrUserData),
+            if TrF1 == [] -> Bin;
+               true -> 'e_field_client.ReadBatchReply_payload'(TrF1, Bin, TrUserData)
+            end;
+        _ -> Bin
     end.
 
 'encode_msg_client.Update'(Msg, TrUserData) -> 'encode_msg_client.Update'(Msg, <<>>, TrUserData).
@@ -478,7 +601,8 @@ encode_msg(Msg, MsgName, Opts) ->
                 {commit, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Request_commit'(TrTF2, <<B1/binary, 34>>, TrUserData) end;
                 {release, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Request_release'(TrTF2, <<B1/binary, 42>>, TrUserData) end;
                 {load, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Request_load'(TrTF2, <<B1/binary, 50>>, TrUserData) end;
-                {ping, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Request_ping'(TrTF2, <<B1/binary, 58>>, TrUserData) end
+                {ping, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Request_ping'(TrTF2, <<B1/binary, 58>>, TrUserData) end;
+                {readBatch, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Request_readBatch'(TrTF2, <<B1/binary, 74>>, TrUserData) end
             end;
         _ -> B1
     end.
@@ -504,10 +628,45 @@ encode_msg(Msg, MsgName, Opts) ->
                 {update, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Response_update'(TrTF2, <<B1/binary, 26>>, TrUserData) end;
                 {commit, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Response_commit'(TrTF2, <<B1/binary, 34>>, TrUserData) end;
                 {load, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Response_load'(TrTF2, <<B1/binary, 42>>, TrUserData) end;
-                {pong, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Response_pong'(TrTF2, <<B1/binary, 50>>, TrUserData) end
+                {pong, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Response_pong'(TrTF2, <<B1/binary, 50>>, TrUserData) end;
+                {readBatch, TF2} -> begin TrTF2 = id(TF2, TrUserData), 'e_mfield_client.Response_readBatch'(TrTF2, <<B1/binary, 58>>, TrUserData) end
             end;
         _ -> B1
     end.
+
+'e_field_client.ReadBatch.Piece_keys'([Elem | Rest], Bin, TrUserData) ->
+    Bin2 = <<Bin/binary, 18>>,
+    Bin3 = e_type_bytes(id(Elem, TrUserData), Bin2, TrUserData),
+    'e_field_client.ReadBatch.Piece_keys'(Rest, Bin3, TrUserData);
+'e_field_client.ReadBatch.Piece_keys'([], Bin, _TrUserData) -> Bin.
+
+'e_mfield_client.ReadBatch_pieces'(Msg, Bin, TrUserData) ->
+    SubBin = 'encode_msg_map<uint32,client.ReadBatch.Piece>'(Msg, <<>>, TrUserData),
+    Bin2 = e_varint(byte_size(SubBin), Bin),
+    <<Bin2/binary, SubBin/binary>>.
+
+'e_field_client.ReadBatch_pieces'([Elem | Rest], Bin, TrUserData) ->
+    Bin2 = <<Bin/binary, 34>>,
+    Bin3 = 'e_mfield_client.ReadBatch_pieces'('tr_encode_client.ReadBatch.pieces[x]'(Elem, TrUserData), Bin2, TrUserData),
+    'e_field_client.ReadBatch_pieces'(Rest, Bin3, TrUserData);
+'e_field_client.ReadBatch_pieces'([], Bin, _TrUserData) -> Bin.
+
+'e_field_client.ReadBatchReply.Piece_values'([Elem | Rest], Bin, TrUserData) ->
+    Bin2 = <<Bin/binary, 26>>,
+    Bin3 = e_type_bytes(id(Elem, TrUserData), Bin2, TrUserData),
+    'e_field_client.ReadBatchReply.Piece_values'(Rest, Bin3, TrUserData);
+'e_field_client.ReadBatchReply.Piece_values'([], Bin, _TrUserData) -> Bin.
+
+'e_mfield_client.ReadBatchReply_payload'(Msg, Bin, TrUserData) ->
+    SubBin = 'encode_msg_map<uint32,client.ReadBatchReply.Piece>'(Msg, <<>>, TrUserData),
+    Bin2 = e_varint(byte_size(SubBin), Bin),
+    <<Bin2/binary, SubBin/binary>>.
+
+'e_field_client.ReadBatchReply_payload'([Elem | Rest], Bin, TrUserData) ->
+    Bin2 = <<Bin/binary, 10>>,
+    Bin3 = 'e_mfield_client.ReadBatchReply_payload'('tr_encode_client.ReadBatchReply.payload[x]'(Elem, TrUserData), Bin2, TrUserData),
+    'e_field_client.ReadBatchReply_payload'(Rest, Bin3, TrUserData);
+'e_field_client.ReadBatchReply_payload'([], Bin, _TrUserData) -> Bin.
 
 'e_mfield_client.Commit_ballots'(Msg, Bin, TrUserData) ->
     SubBin = 'encode_msg_map<uint32,uint32>'(Msg, <<>>, TrUserData),
@@ -562,6 +721,11 @@ encode_msg(Msg, MsgName, Opts) ->
     Bin2 = e_varint(byte_size(SubBin), Bin),
     <<Bin2/binary, SubBin/binary>>.
 
+'e_mfield_client.Request_readBatch'(Msg, Bin, TrUserData) ->
+    SubBin = 'encode_msg_client.ReadBatch'(Msg, <<>>, TrUserData),
+    Bin2 = e_varint(byte_size(SubBin), Bin),
+    <<Bin2/binary, SubBin/binary>>.
+
 'e_mfield_client.Response_read'(Msg, Bin, TrUserData) ->
     SubBin = 'encode_msg_client.ReadReply'(Msg, <<>>, TrUserData),
     Bin2 = e_varint(byte_size(SubBin), Bin),
@@ -581,9 +745,32 @@ encode_msg(Msg, MsgName, Opts) ->
 
 'e_mfield_client.Response_pong'(_Msg, Bin, _TrUserData) -> <<Bin/binary, 0>>.
 
+'e_mfield_client.Response_readBatch'(Msg, Bin, TrUserData) ->
+    SubBin = 'encode_msg_client.ReadBatchReply'(Msg, <<>>, TrUserData),
+    Bin2 = e_varint(byte_size(SubBin), Bin),
+    <<Bin2/binary, SubBin/binary>>.
+
+'encode_msg_map<uint32,client.ReadBatch.Piece>'(#{key := F1, value := F2}, Bin, TrUserData) ->
+    B1 = begin TrF1 = id(F1, TrUserData), e_varint(TrF1, <<Bin/binary, 8>>, TrUserData) end,
+    begin TrF2 = id(F2, TrUserData), 'e_mfield_map<uint32,client.ReadBatch.Piece>_value'(TrF2, <<B1/binary, 18>>, TrUserData) end.
+
+'encode_msg_map<uint32,client.ReadBatchReply.Piece>'(#{key := F1, value := F2}, Bin, TrUserData) ->
+    B1 = begin TrF1 = id(F1, TrUserData), e_varint(TrF1, <<Bin/binary, 8>>, TrUserData) end,
+    begin TrF2 = id(F2, TrUserData), 'e_mfield_map<uint32,client.ReadBatchReply.Piece>_value'(TrF2, <<B1/binary, 18>>, TrUserData) end.
+
 'encode_msg_map<uint32,uint32>'(#{key := F1, value := F2}, Bin, TrUserData) ->
     B1 = begin TrF1 = id(F1, TrUserData), e_varint(TrF1, <<Bin/binary, 8>>, TrUserData) end,
     begin TrF2 = id(F2, TrUserData), e_varint(TrF2, <<B1/binary, 16>>, TrUserData) end.
+
+'e_mfield_map<uint32,client.ReadBatch.Piece>_value'(Msg, Bin, TrUserData) ->
+    SubBin = 'encode_msg_client.ReadBatch.Piece'(Msg, <<>>, TrUserData),
+    Bin2 = e_varint(byte_size(SubBin), Bin),
+    <<Bin2/binary, SubBin/binary>>.
+
+'e_mfield_map<uint32,client.ReadBatchReply.Piece>_value'(Msg, Bin, TrUserData) ->
+    SubBin = 'encode_msg_client.ReadBatchReply.Piece'(Msg, <<>>, TrUserData),
+    Bin2 = e_varint(byte_size(SubBin), Bin),
+    <<Bin2/binary, SubBin/binary>>.
 
 -compile({nowarn_unused_function,e_type_sint/3}).
 e_type_sint(Value, Bin, _TrUserData) when Value >= 0 -> e_varint(Value * 2, Bin);
@@ -727,6 +914,10 @@ decode_msg_2_doit('client.Load', Bin, TrUserData) -> id('decode_msg_client.Load'
 decode_msg_2_doit('client.LoadReply', Bin, TrUserData) -> id('decode_msg_client.LoadReply'(Bin, TrUserData), TrUserData);
 decode_msg_2_doit('client.Read', Bin, TrUserData) -> id('decode_msg_client.Read'(Bin, TrUserData), TrUserData);
 decode_msg_2_doit('client.ReadReply', Bin, TrUserData) -> id('decode_msg_client.ReadReply'(Bin, TrUserData), TrUserData);
+decode_msg_2_doit('client.ReadBatch.Piece', Bin, TrUserData) -> id('decode_msg_client.ReadBatch.Piece'(Bin, TrUserData), TrUserData);
+decode_msg_2_doit('client.ReadBatch', Bin, TrUserData) -> id('decode_msg_client.ReadBatch'(Bin, TrUserData), TrUserData);
+decode_msg_2_doit('client.ReadBatchReply.Piece', Bin, TrUserData) -> id('decode_msg_client.ReadBatchReply.Piece'(Bin, TrUserData), TrUserData);
+decode_msg_2_doit('client.ReadBatchReply', Bin, TrUserData) -> id('decode_msg_client.ReadBatchReply'(Bin, TrUserData), TrUserData);
 decode_msg_2_doit('client.Update', Bin, TrUserData) -> id('decode_msg_client.Update'(Bin, TrUserData), TrUserData);
 decode_msg_2_doit('client.UpdateReply', Bin, TrUserData) -> id('decode_msg_client.UpdateReply'(Bin, TrUserData), TrUserData);
 decode_msg_2_doit('client.Commit', Bin, TrUserData) -> id('decode_msg_client.Commit'(Bin, TrUserData), TrUserData);
@@ -983,6 +1174,225 @@ decode_msg_2_doit('client.Response', Bin, TrUserData) -> id('decode_msg_client.R
 'skip_32_client.ReadReply'(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> 'dfp_read_field_def_client.ReadReply'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData).
 
 'skip_64_client.ReadReply'(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> 'dfp_read_field_def_client.ReadReply'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData).
+
+'decode_msg_client.ReadBatch.Piece'(Bin, TrUserData) -> 'dfp_read_field_def_client.ReadBatch.Piece'(Bin, 0, 0, 0, id('$undef', TrUserData), id([], TrUserData), TrUserData).
+
+'dfp_read_field_def_client.ReadBatch.Piece'(<<10, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.ReadBatch.Piece_prevLeader'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+'dfp_read_field_def_client.ReadBatch.Piece'(<<18, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.ReadBatch.Piece_keys'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+'dfp_read_field_def_client.ReadBatch.Piece'(<<>>, 0, 0, _, F@_1, R1, TrUserData) ->
+    S1 = #{keys => lists_reverse(R1, TrUserData)},
+    if F@_1 == '$undef' -> S1;
+       true -> S1#{prevLeader => F@_1}
+    end;
+'dfp_read_field_def_client.ReadBatch.Piece'(Other, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dg_read_field_def_client.ReadBatch.Piece'(Other, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+'dg_read_field_def_client.ReadBatch.Piece'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 32 - 7 -> 'dg_read_field_def_client.ReadBatch.Piece'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'dg_read_field_def_client.ReadBatch.Piece'(<<0:1, X:7, Rest/binary>>, N, Acc, _, F@_1, F@_2, TrUserData) ->
+    Key = X bsl N + Acc,
+    case Key of
+        10 -> 'd_field_client.ReadBatch.Piece_prevLeader'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
+        18 -> 'd_field_client.ReadBatch.Piece_keys'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
+        _ ->
+            case Key band 7 of
+                0 -> 'skip_varint_client.ReadBatch.Piece'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                1 -> 'skip_64_client.ReadBatch.Piece'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                2 -> 'skip_length_delimited_client.ReadBatch.Piece'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                3 -> 'skip_group_client.ReadBatch.Piece'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                5 -> 'skip_32_client.ReadBatch.Piece'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData)
+            end
+    end;
+'dg_read_field_def_client.ReadBatch.Piece'(<<>>, 0, 0, _, F@_1, R1, TrUserData) ->
+    S1 = #{keys => lists_reverse(R1, TrUserData)},
+    if F@_1 == '$undef' -> S1;
+       true -> S1#{prevLeader => F@_1}
+    end.
+
+'d_field_client.ReadBatch.Piece_prevLeader'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'd_field_client.ReadBatch.Piece_prevLeader'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'d_field_client.ReadBatch.Piece_prevLeader'(<<0:1, X:7, Rest/binary>>, N, Acc, F, _, F@_2, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bytes:Len/binary, Rest2/binary>> = Rest, Bytes2 = binary:copy(Bytes), {id(Bytes2, TrUserData), Rest2} end,
+    'dfp_read_field_def_client.ReadBatch.Piece'(RestF, 0, 0, F, NewFValue, F@_2, TrUserData).
+
+'d_field_client.ReadBatch.Piece_keys'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'd_field_client.ReadBatch.Piece_keys'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'d_field_client.ReadBatch.Piece_keys'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, Prev, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bytes:Len/binary, Rest2/binary>> = Rest, Bytes2 = binary:copy(Bytes), {id(Bytes2, TrUserData), Rest2} end,
+    'dfp_read_field_def_client.ReadBatch.Piece'(RestF, 0, 0, F, F@_1, cons(NewFValue, Prev, TrUserData), TrUserData).
+
+'skip_varint_client.ReadBatch.Piece'(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'skip_varint_client.ReadBatch.Piece'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+'skip_varint_client.ReadBatch.Piece'(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_client.ReadBatch.Piece'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+'skip_length_delimited_client.ReadBatch.Piece'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'skip_length_delimited_client.ReadBatch.Piece'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'skip_length_delimited_client.ReadBatch.Piece'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) ->
+    Length = X bsl N + Acc,
+    <<_:Length/binary, Rest2/binary>> = Rest,
+    'dfp_read_field_def_client.ReadBatch.Piece'(Rest2, 0, 0, F, F@_1, F@_2, TrUserData).
+
+'skip_group_client.ReadBatch.Piece'(Bin, _, Z2, FNum, F@_1, F@_2, TrUserData) ->
+    {_, Rest} = read_group(Bin, FNum),
+    'dfp_read_field_def_client.ReadBatch.Piece'(Rest, 0, Z2, FNum, F@_1, F@_2, TrUserData).
+
+'skip_32_client.ReadBatch.Piece'(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_client.ReadBatch.Piece'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+'skip_64_client.ReadBatch.Piece'(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_client.ReadBatch.Piece'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+'decode_msg_client.ReadBatch'(Bin, TrUserData) -> 'dfp_read_field_def_client.ReadBatch'(Bin, 0, 0, 0, id(<<>>, TrUserData), id(0, TrUserData), 'tr_decode_init_default_client.ReadBatch.pieces'([], TrUserData), TrUserData).
+
+'dfp_read_field_def_client.ReadBatch'(<<10, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> 'd_field_client.ReadBatch_txId'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData);
+'dfp_read_field_def_client.ReadBatch'(<<16, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> 'd_field_client.ReadBatch_timestamp'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData);
+'dfp_read_field_def_client.ReadBatch'(<<34, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> 'd_field_client.ReadBatch_pieces'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData);
+'dfp_read_field_def_client.ReadBatch'(<<>>, 0, 0, _, F@_1, F@_2, R1, TrUserData) -> #{txId => F@_1, timestamp => F@_2, pieces => 'tr_decode_repeated_finalize_client.ReadBatch.pieces'(R1, TrUserData)};
+'dfp_read_field_def_client.ReadBatch'(Other, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> 'dg_read_field_def_client.ReadBatch'(Other, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData).
+
+'dg_read_field_def_client.ReadBatch'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 32 - 7 -> 'dg_read_field_def_client.ReadBatch'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+'dg_read_field_def_client.ReadBatch'(<<0:1, X:7, Rest/binary>>, N, Acc, _, F@_1, F@_2, F@_3, TrUserData) ->
+    Key = X bsl N + Acc,
+    case Key of
+        10 -> 'd_field_client.ReadBatch_txId'(Rest, 0, 0, 0, F@_1, F@_2, F@_3, TrUserData);
+        16 -> 'd_field_client.ReadBatch_timestamp'(Rest, 0, 0, 0, F@_1, F@_2, F@_3, TrUserData);
+        34 -> 'd_field_client.ReadBatch_pieces'(Rest, 0, 0, 0, F@_1, F@_2, F@_3, TrUserData);
+        _ ->
+            case Key band 7 of
+                0 -> 'skip_varint_client.ReadBatch'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData);
+                1 -> 'skip_64_client.ReadBatch'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData);
+                2 -> 'skip_length_delimited_client.ReadBatch'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData);
+                3 -> 'skip_group_client.ReadBatch'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData);
+                5 -> 'skip_32_client.ReadBatch'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData)
+            end
+    end;
+'dg_read_field_def_client.ReadBatch'(<<>>, 0, 0, _, F@_1, F@_2, R1, TrUserData) -> #{txId => F@_1, timestamp => F@_2, pieces => 'tr_decode_repeated_finalize_client.ReadBatch.pieces'(R1, TrUserData)}.
+
+'d_field_client.ReadBatch_txId'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 57 -> 'd_field_client.ReadBatch_txId'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+'d_field_client.ReadBatch_txId'(<<0:1, X:7, Rest/binary>>, N, Acc, F, _, F@_2, F@_3, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bytes:Len/binary, Rest2/binary>> = Rest, Bytes2 = binary:copy(Bytes), {id(Bytes2, TrUserData), Rest2} end,
+    'dfp_read_field_def_client.ReadBatch'(RestF, 0, 0, F, NewFValue, F@_2, F@_3, TrUserData).
+
+'d_field_client.ReadBatch_timestamp'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 57 -> 'd_field_client.ReadBatch_timestamp'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+'d_field_client.ReadBatch_timestamp'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, _, F@_3, TrUserData) ->
+    {NewFValue, RestF} = {id((X bsl N + Acc) band 18446744073709551615, TrUserData), Rest},
+    'dfp_read_field_def_client.ReadBatch'(RestF, 0, 0, F, F@_1, NewFValue, F@_3, TrUserData).
+
+'d_field_client.ReadBatch_pieces'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 57 -> 'd_field_client.ReadBatch_pieces'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+'d_field_client.ReadBatch_pieces'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, Prev, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bs:Len/binary, Rest2/binary>> = Rest, {id('decode_msg_map<uint32,client.ReadBatch.Piece>'(Bs, TrUserData), TrUserData), Rest2} end,
+    'dfp_read_field_def_client.ReadBatch'(RestF, 0, 0, F, F@_1, F@_2, 'tr_decode_repeated_add_elem_client.ReadBatch.pieces'(NewFValue, Prev, TrUserData), TrUserData).
+
+'skip_varint_client.ReadBatch'(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> 'skip_varint_client.ReadBatch'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData);
+'skip_varint_client.ReadBatch'(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> 'dfp_read_field_def_client.ReadBatch'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData).
+
+'skip_length_delimited_client.ReadBatch'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 57 -> 'skip_length_delimited_client.ReadBatch'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+'skip_length_delimited_client.ReadBatch'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) ->
+    Length = X bsl N + Acc,
+    <<_:Length/binary, Rest2/binary>> = Rest,
+    'dfp_read_field_def_client.ReadBatch'(Rest2, 0, 0, F, F@_1, F@_2, F@_3, TrUserData).
+
+'skip_group_client.ReadBatch'(Bin, _, Z2, FNum, F@_1, F@_2, F@_3, TrUserData) ->
+    {_, Rest} = read_group(Bin, FNum),
+    'dfp_read_field_def_client.ReadBatch'(Rest, 0, Z2, FNum, F@_1, F@_2, F@_3, TrUserData).
+
+'skip_32_client.ReadBatch'(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> 'dfp_read_field_def_client.ReadBatch'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData).
+
+'skip_64_client.ReadBatch'(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> 'dfp_read_field_def_client.ReadBatch'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData).
+
+'decode_msg_client.ReadBatchReply.Piece'(Bin, TrUserData) -> 'dfp_read_field_def_client.ReadBatchReply.Piece'(Bin, 0, 0, 0, id(0, TrUserData), id(<<>>, TrUserData), id([], TrUserData), TrUserData).
+
+'dfp_read_field_def_client.ReadBatchReply.Piece'(<<8, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> 'd_field_client.ReadBatchReply.Piece_ballot'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData);
+'dfp_read_field_def_client.ReadBatchReply.Piece'(<<18, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> 'd_field_client.ReadBatchReply.Piece_servedBy'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData);
+'dfp_read_field_def_client.ReadBatchReply.Piece'(<<26, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> 'd_field_client.ReadBatchReply.Piece_values'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData);
+'dfp_read_field_def_client.ReadBatchReply.Piece'(<<>>, 0, 0, _, F@_1, F@_2, R1, TrUserData) -> #{ballot => F@_1, servedBy => F@_2, values => lists_reverse(R1, TrUserData)};
+'dfp_read_field_def_client.ReadBatchReply.Piece'(Other, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> 'dg_read_field_def_client.ReadBatchReply.Piece'(Other, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData).
+
+'dg_read_field_def_client.ReadBatchReply.Piece'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 32 - 7 -> 'dg_read_field_def_client.ReadBatchReply.Piece'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+'dg_read_field_def_client.ReadBatchReply.Piece'(<<0:1, X:7, Rest/binary>>, N, Acc, _, F@_1, F@_2, F@_3, TrUserData) ->
+    Key = X bsl N + Acc,
+    case Key of
+        8 -> 'd_field_client.ReadBatchReply.Piece_ballot'(Rest, 0, 0, 0, F@_1, F@_2, F@_3, TrUserData);
+        18 -> 'd_field_client.ReadBatchReply.Piece_servedBy'(Rest, 0, 0, 0, F@_1, F@_2, F@_3, TrUserData);
+        26 -> 'd_field_client.ReadBatchReply.Piece_values'(Rest, 0, 0, 0, F@_1, F@_2, F@_3, TrUserData);
+        _ ->
+            case Key band 7 of
+                0 -> 'skip_varint_client.ReadBatchReply.Piece'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData);
+                1 -> 'skip_64_client.ReadBatchReply.Piece'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData);
+                2 -> 'skip_length_delimited_client.ReadBatchReply.Piece'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData);
+                3 -> 'skip_group_client.ReadBatchReply.Piece'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData);
+                5 -> 'skip_32_client.ReadBatchReply.Piece'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData)
+            end
+    end;
+'dg_read_field_def_client.ReadBatchReply.Piece'(<<>>, 0, 0, _, F@_1, F@_2, R1, TrUserData) -> #{ballot => F@_1, servedBy => F@_2, values => lists_reverse(R1, TrUserData)}.
+
+'d_field_client.ReadBatchReply.Piece_ballot'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 57 -> 'd_field_client.ReadBatchReply.Piece_ballot'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+'d_field_client.ReadBatchReply.Piece_ballot'(<<0:1, X:7, Rest/binary>>, N, Acc, F, _, F@_2, F@_3, TrUserData) ->
+    {NewFValue, RestF} = {id((X bsl N + Acc) band 4294967295, TrUserData), Rest},
+    'dfp_read_field_def_client.ReadBatchReply.Piece'(RestF, 0, 0, F, NewFValue, F@_2, F@_3, TrUserData).
+
+'d_field_client.ReadBatchReply.Piece_servedBy'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 57 -> 'd_field_client.ReadBatchReply.Piece_servedBy'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+'d_field_client.ReadBatchReply.Piece_servedBy'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, _, F@_3, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bytes:Len/binary, Rest2/binary>> = Rest, Bytes2 = binary:copy(Bytes), {id(Bytes2, TrUserData), Rest2} end,
+    'dfp_read_field_def_client.ReadBatchReply.Piece'(RestF, 0, 0, F, F@_1, NewFValue, F@_3, TrUserData).
+
+'d_field_client.ReadBatchReply.Piece_values'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 57 -> 'd_field_client.ReadBatchReply.Piece_values'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+'d_field_client.ReadBatchReply.Piece_values'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, Prev, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bytes:Len/binary, Rest2/binary>> = Rest, Bytes2 = binary:copy(Bytes), {id(Bytes2, TrUserData), Rest2} end,
+    'dfp_read_field_def_client.ReadBatchReply.Piece'(RestF, 0, 0, F, F@_1, F@_2, cons(NewFValue, Prev, TrUserData), TrUserData).
+
+'skip_varint_client.ReadBatchReply.Piece'(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> 'skip_varint_client.ReadBatchReply.Piece'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData);
+'skip_varint_client.ReadBatchReply.Piece'(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> 'dfp_read_field_def_client.ReadBatchReply.Piece'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData).
+
+'skip_length_delimited_client.ReadBatchReply.Piece'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 57 -> 'skip_length_delimited_client.ReadBatchReply.Piece'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+'skip_length_delimited_client.ReadBatchReply.Piece'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) ->
+    Length = X bsl N + Acc,
+    <<_:Length/binary, Rest2/binary>> = Rest,
+    'dfp_read_field_def_client.ReadBatchReply.Piece'(Rest2, 0, 0, F, F@_1, F@_2, F@_3, TrUserData).
+
+'skip_group_client.ReadBatchReply.Piece'(Bin, _, Z2, FNum, F@_1, F@_2, F@_3, TrUserData) ->
+    {_, Rest} = read_group(Bin, FNum),
+    'dfp_read_field_def_client.ReadBatchReply.Piece'(Rest, 0, Z2, FNum, F@_1, F@_2, F@_3, TrUserData).
+
+'skip_32_client.ReadBatchReply.Piece'(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> 'dfp_read_field_def_client.ReadBatchReply.Piece'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData).
+
+'skip_64_client.ReadBatchReply.Piece'(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> 'dfp_read_field_def_client.ReadBatchReply.Piece'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData).
+
+'decode_msg_client.ReadBatchReply'(Bin, TrUserData) -> 'dfp_read_field_def_client.ReadBatchReply'(Bin, 0, 0, 0, 'tr_decode_init_default_client.ReadBatchReply.payload'([], TrUserData), TrUserData).
+
+'dfp_read_field_def_client.ReadBatchReply'(<<10, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> 'd_field_client.ReadBatchReply_payload'(Rest, Z1, Z2, F, F@_1, TrUserData);
+'dfp_read_field_def_client.ReadBatchReply'(<<>>, 0, 0, _, R1, TrUserData) -> #{payload => 'tr_decode_repeated_finalize_client.ReadBatchReply.payload'(R1, TrUserData)};
+'dfp_read_field_def_client.ReadBatchReply'(Other, Z1, Z2, F, F@_1, TrUserData) -> 'dg_read_field_def_client.ReadBatchReply'(Other, Z1, Z2, F, F@_1, TrUserData).
+
+'dg_read_field_def_client.ReadBatchReply'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, TrUserData) when N < 32 - 7 -> 'dg_read_field_def_client.ReadBatchReply'(Rest, N + 7, X bsl N + Acc, F, F@_1, TrUserData);
+'dg_read_field_def_client.ReadBatchReply'(<<0:1, X:7, Rest/binary>>, N, Acc, _, F@_1, TrUserData) ->
+    Key = X bsl N + Acc,
+    case Key of
+        10 -> 'd_field_client.ReadBatchReply_payload'(Rest, 0, 0, 0, F@_1, TrUserData);
+        _ ->
+            case Key band 7 of
+                0 -> 'skip_varint_client.ReadBatchReply'(Rest, 0, 0, Key bsr 3, F@_1, TrUserData);
+                1 -> 'skip_64_client.ReadBatchReply'(Rest, 0, 0, Key bsr 3, F@_1, TrUserData);
+                2 -> 'skip_length_delimited_client.ReadBatchReply'(Rest, 0, 0, Key bsr 3, F@_1, TrUserData);
+                3 -> 'skip_group_client.ReadBatchReply'(Rest, 0, 0, Key bsr 3, F@_1, TrUserData);
+                5 -> 'skip_32_client.ReadBatchReply'(Rest, 0, 0, Key bsr 3, F@_1, TrUserData)
+            end
+    end;
+'dg_read_field_def_client.ReadBatchReply'(<<>>, 0, 0, _, R1, TrUserData) -> #{payload => 'tr_decode_repeated_finalize_client.ReadBatchReply.payload'(R1, TrUserData)}.
+
+'d_field_client.ReadBatchReply_payload'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, TrUserData) when N < 57 -> 'd_field_client.ReadBatchReply_payload'(Rest, N + 7, X bsl N + Acc, F, F@_1, TrUserData);
+'d_field_client.ReadBatchReply_payload'(<<0:1, X:7, Rest/binary>>, N, Acc, F, Prev, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bs:Len/binary, Rest2/binary>> = Rest, {id('decode_msg_map<uint32,client.ReadBatchReply.Piece>'(Bs, TrUserData), TrUserData), Rest2} end,
+    'dfp_read_field_def_client.ReadBatchReply'(RestF, 0, 0, F, 'tr_decode_repeated_add_elem_client.ReadBatchReply.payload'(NewFValue, Prev, TrUserData), TrUserData).
+
+'skip_varint_client.ReadBatchReply'(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> 'skip_varint_client.ReadBatchReply'(Rest, Z1, Z2, F, F@_1, TrUserData);
+'skip_varint_client.ReadBatchReply'(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> 'dfp_read_field_def_client.ReadBatchReply'(Rest, Z1, Z2, F, F@_1, TrUserData).
+
+'skip_length_delimited_client.ReadBatchReply'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, TrUserData) when N < 57 -> 'skip_length_delimited_client.ReadBatchReply'(Rest, N + 7, X bsl N + Acc, F, F@_1, TrUserData);
+'skip_length_delimited_client.ReadBatchReply'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, TrUserData) ->
+    Length = X bsl N + Acc,
+    <<_:Length/binary, Rest2/binary>> = Rest,
+    'dfp_read_field_def_client.ReadBatchReply'(Rest2, 0, 0, F, F@_1, TrUserData).
+
+'skip_group_client.ReadBatchReply'(Bin, _, Z2, FNum, F@_1, TrUserData) ->
+    {_, Rest} = read_group(Bin, FNum),
+    'dfp_read_field_def_client.ReadBatchReply'(Rest, 0, Z2, FNum, F@_1, TrUserData).
+
+'skip_32_client.ReadBatchReply'(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> 'dfp_read_field_def_client.ReadBatchReply'(Rest, Z1, Z2, F, F@_1, TrUserData).
+
+'skip_64_client.ReadBatchReply'(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, TrUserData) -> 'dfp_read_field_def_client.ReadBatchReply'(Rest, Z1, Z2, F, F@_1, TrUserData).
 
 'decode_msg_client.Update'(Bin, TrUserData) -> 'dfp_read_field_def_client.Update'(Bin, 0, 0, 0, id('$undef', TrUserData), id(<<>>, TrUserData), id(0, TrUserData), id(<<>>, TrUserData), id('$undef', TrUserData), TrUserData).
 
@@ -1458,6 +1868,7 @@ decode_msg_2_doit('client.Response', Bin, TrUserData) -> id('decode_msg_client.R
 'dfp_read_field_def_client.Request'(<<42, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.Request_release'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
 'dfp_read_field_def_client.Request'(<<50, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.Request_load'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
 'dfp_read_field_def_client.Request'(<<58, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.Request_ping'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+'dfp_read_field_def_client.Request'(<<74, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.Request_readBatch'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
 'dfp_read_field_def_client.Request'(<<>>, 0, 0, _, F@_1, F@_2, _) ->
     S1 = #{seq => F@_1},
     if F@_2 == '$undef' -> S1;
@@ -1476,6 +1887,7 @@ decode_msg_2_doit('client.Response', Bin, TrUserData) -> id('decode_msg_client.R
         42 -> 'd_field_client.Request_release'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
         50 -> 'd_field_client.Request_load'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
         58 -> 'd_field_client.Request_ping'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
+        74 -> 'd_field_client.Request_readBatch'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
         _ ->
             case Key band 7 of
                 0 -> 'skip_varint_client.Request'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
@@ -1586,6 +1998,21 @@ decode_msg_2_doit('client.Response', Bin, TrUserData) -> id('decode_msg_client.R
                                         end,
                                         TrUserData).
 
+'d_field_client.Request_readBatch'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'd_field_client.Request_readBatch'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'d_field_client.Request_readBatch'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, Prev, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bs:Len/binary, Rest2/binary>> = Rest, {id('decode_msg_client.ReadBatch'(Bs, TrUserData), TrUserData), Rest2} end,
+    'dfp_read_field_def_client.Request'(RestF,
+                                        0,
+                                        0,
+                                        F,
+                                        F@_1,
+                                        case Prev of
+                                            '$undef' -> id({readBatch, NewFValue}, TrUserData);
+                                            {readBatch, MVPrev} -> id({readBatch, 'merge_msg_client.ReadBatch'(MVPrev, NewFValue, TrUserData)}, TrUserData);
+                                            _ -> id({readBatch, NewFValue}, TrUserData)
+                                        end,
+                                        TrUserData).
+
 'skip_varint_client.Request'(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'skip_varint_client.Request'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
 'skip_varint_client.Request'(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_client.Request'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
 
@@ -1611,6 +2038,7 @@ decode_msg_2_doit('client.Response', Bin, TrUserData) -> id('decode_msg_client.R
 'dfp_read_field_def_client.Response'(<<34, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.Response_commit'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
 'dfp_read_field_def_client.Response'(<<42, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.Response_load'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
 'dfp_read_field_def_client.Response'(<<50, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.Response_pong'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+'dfp_read_field_def_client.Response'(<<58, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_client.Response_readBatch'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
 'dfp_read_field_def_client.Response'(<<>>, 0, 0, _, F@_1, F@_2, _) ->
     S1 = #{seq => F@_1},
     if F@_2 == '$undef' -> S1;
@@ -1628,6 +2056,7 @@ decode_msg_2_doit('client.Response', Bin, TrUserData) -> id('decode_msg_client.R
         34 -> 'd_field_client.Response_commit'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
         42 -> 'd_field_client.Response_load'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
         50 -> 'd_field_client.Response_pong'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
+        58 -> 'd_field_client.Response_readBatch'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
         _ ->
             case Key band 7 of
                 0 -> 'skip_varint_client.Response'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
@@ -1723,6 +2152,21 @@ decode_msg_2_doit('client.Response', Bin, TrUserData) -> id('decode_msg_client.R
                                          end,
                                          TrUserData).
 
+'d_field_client.Response_readBatch'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'd_field_client.Response_readBatch'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'d_field_client.Response_readBatch'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, Prev, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bs:Len/binary, Rest2/binary>> = Rest, {id('decode_msg_client.ReadBatchReply'(Bs, TrUserData), TrUserData), Rest2} end,
+    'dfp_read_field_def_client.Response'(RestF,
+                                         0,
+                                         0,
+                                         F,
+                                         F@_1,
+                                         case Prev of
+                                             '$undef' -> id({readBatch, NewFValue}, TrUserData);
+                                             {readBatch, MVPrev} -> id({readBatch, 'merge_msg_client.ReadBatchReply'(MVPrev, NewFValue, TrUserData)}, TrUserData);
+                                             _ -> id({readBatch, NewFValue}, TrUserData)
+                                         end,
+                                         TrUserData).
+
 'skip_varint_client.Response'(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'skip_varint_client.Response'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
 'skip_varint_client.Response'(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_client.Response'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
 
@@ -1739,6 +2183,142 @@ decode_msg_2_doit('client.Response', Bin, TrUserData) -> id('decode_msg_client.R
 'skip_32_client.Response'(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_client.Response'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
 
 'skip_64_client.Response'(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_client.Response'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+'decode_msg_map<uint32,client.ReadBatch.Piece>'(Bin, TrUserData) -> 'dfp_read_field_def_map<uint32,client.ReadBatch.Piece>'(Bin, 0, 0, 0, id(0, TrUserData), id('$undef', TrUserData), TrUserData).
+
+'dfp_read_field_def_map<uint32,client.ReadBatch.Piece>'(<<8, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_map<uint32,client.ReadBatch.Piece>_key'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+'dfp_read_field_def_map<uint32,client.ReadBatch.Piece>'(<<18, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_map<uint32,client.ReadBatch.Piece>_value'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+'dfp_read_field_def_map<uint32,client.ReadBatch.Piece>'(<<>>, 0, 0, _, F@_1, F@_2, _) ->
+    S1 = #{key => F@_1},
+    if F@_2 == '$undef' -> S1;
+       true -> S1#{value => F@_2}
+    end;
+'dfp_read_field_def_map<uint32,client.ReadBatch.Piece>'(Other, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dg_read_field_def_map<uint32,client.ReadBatch.Piece>'(Other, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+'dg_read_field_def_map<uint32,client.ReadBatch.Piece>'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 32 - 7 -> 'dg_read_field_def_map<uint32,client.ReadBatch.Piece>'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'dg_read_field_def_map<uint32,client.ReadBatch.Piece>'(<<0:1, X:7, Rest/binary>>, N, Acc, _, F@_1, F@_2, TrUserData) ->
+    Key = X bsl N + Acc,
+    case Key of
+        8 -> 'd_field_map<uint32,client.ReadBatch.Piece>_key'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
+        18 -> 'd_field_map<uint32,client.ReadBatch.Piece>_value'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
+        _ ->
+            case Key band 7 of
+                0 -> 'skip_varint_map<uint32,client.ReadBatch.Piece>'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                1 -> 'skip_64_map<uint32,client.ReadBatch.Piece>'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                2 -> 'skip_length_delimited_map<uint32,client.ReadBatch.Piece>'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                3 -> 'skip_group_map<uint32,client.ReadBatch.Piece>'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                5 -> 'skip_32_map<uint32,client.ReadBatch.Piece>'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData)
+            end
+    end;
+'dg_read_field_def_map<uint32,client.ReadBatch.Piece>'(<<>>, 0, 0, _, F@_1, F@_2, _) ->
+    S1 = #{key => F@_1},
+    if F@_2 == '$undef' -> S1;
+       true -> S1#{value => F@_2}
+    end.
+
+'d_field_map<uint32,client.ReadBatch.Piece>_key'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'd_field_map<uint32,client.ReadBatch.Piece>_key'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'d_field_map<uint32,client.ReadBatch.Piece>_key'(<<0:1, X:7, Rest/binary>>, N, Acc, F, _, F@_2, TrUserData) ->
+    {NewFValue, RestF} = {id((X bsl N + Acc) band 4294967295, TrUserData), Rest},
+    'dfp_read_field_def_map<uint32,client.ReadBatch.Piece>'(RestF, 0, 0, F, NewFValue, F@_2, TrUserData).
+
+'d_field_map<uint32,client.ReadBatch.Piece>_value'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'd_field_map<uint32,client.ReadBatch.Piece>_value'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'d_field_map<uint32,client.ReadBatch.Piece>_value'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, Prev, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bs:Len/binary, Rest2/binary>> = Rest, {id('decode_msg_client.ReadBatch.Piece'(Bs, TrUserData), TrUserData), Rest2} end,
+    'dfp_read_field_def_map<uint32,client.ReadBatch.Piece>'(RestF,
+                                                            0,
+                                                            0,
+                                                            F,
+                                                            F@_1,
+                                                            if Prev == '$undef' -> NewFValue;
+                                                               true -> 'merge_msg_client.ReadBatch.Piece'(Prev, NewFValue, TrUserData)
+                                                            end,
+                                                            TrUserData).
+
+'skip_varint_map<uint32,client.ReadBatch.Piece>'(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'skip_varint_map<uint32,client.ReadBatch.Piece>'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+'skip_varint_map<uint32,client.ReadBatch.Piece>'(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_map<uint32,client.ReadBatch.Piece>'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+'skip_length_delimited_map<uint32,client.ReadBatch.Piece>'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'skip_length_delimited_map<uint32,client.ReadBatch.Piece>'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'skip_length_delimited_map<uint32,client.ReadBatch.Piece>'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) ->
+    Length = X bsl N + Acc,
+    <<_:Length/binary, Rest2/binary>> = Rest,
+    'dfp_read_field_def_map<uint32,client.ReadBatch.Piece>'(Rest2, 0, 0, F, F@_1, F@_2, TrUserData).
+
+'skip_group_map<uint32,client.ReadBatch.Piece>'(Bin, _, Z2, FNum, F@_1, F@_2, TrUserData) ->
+    {_, Rest} = read_group(Bin, FNum),
+    'dfp_read_field_def_map<uint32,client.ReadBatch.Piece>'(Rest, 0, Z2, FNum, F@_1, F@_2, TrUserData).
+
+'skip_32_map<uint32,client.ReadBatch.Piece>'(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_map<uint32,client.ReadBatch.Piece>'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+'skip_64_map<uint32,client.ReadBatch.Piece>'(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_map<uint32,client.ReadBatch.Piece>'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+'decode_msg_map<uint32,client.ReadBatchReply.Piece>'(Bin, TrUserData) -> 'dfp_read_field_def_map<uint32,client.ReadBatchReply.Piece>'(Bin, 0, 0, 0, id(0, TrUserData), id('$undef', TrUserData), TrUserData).
+
+'dfp_read_field_def_map<uint32,client.ReadBatchReply.Piece>'(<<8, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_map<uint32,client.ReadBatchReply.Piece>_key'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+'dfp_read_field_def_map<uint32,client.ReadBatchReply.Piece>'(<<18, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_map<uint32,client.ReadBatchReply.Piece>_value'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+'dfp_read_field_def_map<uint32,client.ReadBatchReply.Piece>'(<<>>, 0, 0, _, F@_1, F@_2, _) ->
+    S1 = #{key => F@_1},
+    if F@_2 == '$undef' -> S1;
+       true -> S1#{value => F@_2}
+    end;
+'dfp_read_field_def_map<uint32,client.ReadBatchReply.Piece>'(Other, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dg_read_field_def_map<uint32,client.ReadBatchReply.Piece>'(Other, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+'dg_read_field_def_map<uint32,client.ReadBatchReply.Piece>'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 32 - 7 ->
+    'dg_read_field_def_map<uint32,client.ReadBatchReply.Piece>'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'dg_read_field_def_map<uint32,client.ReadBatchReply.Piece>'(<<0:1, X:7, Rest/binary>>, N, Acc, _, F@_1, F@_2, TrUserData) ->
+    Key = X bsl N + Acc,
+    case Key of
+        8 -> 'd_field_map<uint32,client.ReadBatchReply.Piece>_key'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
+        18 -> 'd_field_map<uint32,client.ReadBatchReply.Piece>_value'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
+        _ ->
+            case Key band 7 of
+                0 -> 'skip_varint_map<uint32,client.ReadBatchReply.Piece>'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                1 -> 'skip_64_map<uint32,client.ReadBatchReply.Piece>'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                2 -> 'skip_length_delimited_map<uint32,client.ReadBatchReply.Piece>'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                3 -> 'skip_group_map<uint32,client.ReadBatchReply.Piece>'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                5 -> 'skip_32_map<uint32,client.ReadBatchReply.Piece>'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData)
+            end
+    end;
+'dg_read_field_def_map<uint32,client.ReadBatchReply.Piece>'(<<>>, 0, 0, _, F@_1, F@_2, _) ->
+    S1 = #{key => F@_1},
+    if F@_2 == '$undef' -> S1;
+       true -> S1#{value => F@_2}
+    end.
+
+'d_field_map<uint32,client.ReadBatchReply.Piece>_key'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'd_field_map<uint32,client.ReadBatchReply.Piece>_key'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'d_field_map<uint32,client.ReadBatchReply.Piece>_key'(<<0:1, X:7, Rest/binary>>, N, Acc, F, _, F@_2, TrUserData) ->
+    {NewFValue, RestF} = {id((X bsl N + Acc) band 4294967295, TrUserData), Rest},
+    'dfp_read_field_def_map<uint32,client.ReadBatchReply.Piece>'(RestF, 0, 0, F, NewFValue, F@_2, TrUserData).
+
+'d_field_map<uint32,client.ReadBatchReply.Piece>_value'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'd_field_map<uint32,client.ReadBatchReply.Piece>_value'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'d_field_map<uint32,client.ReadBatchReply.Piece>_value'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, Prev, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bs:Len/binary, Rest2/binary>> = Rest, {id('decode_msg_client.ReadBatchReply.Piece'(Bs, TrUserData), TrUserData), Rest2} end,
+    'dfp_read_field_def_map<uint32,client.ReadBatchReply.Piece>'(RestF,
+                                                                 0,
+                                                                 0,
+                                                                 F,
+                                                                 F@_1,
+                                                                 if Prev == '$undef' -> NewFValue;
+                                                                    true -> 'merge_msg_client.ReadBatchReply.Piece'(Prev, NewFValue, TrUserData)
+                                                                 end,
+                                                                 TrUserData).
+
+'skip_varint_map<uint32,client.ReadBatchReply.Piece>'(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'skip_varint_map<uint32,client.ReadBatchReply.Piece>'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+'skip_varint_map<uint32,client.ReadBatchReply.Piece>'(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_map<uint32,client.ReadBatchReply.Piece>'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+'skip_length_delimited_map<uint32,client.ReadBatchReply.Piece>'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 ->
+    'skip_length_delimited_map<uint32,client.ReadBatchReply.Piece>'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'skip_length_delimited_map<uint32,client.ReadBatchReply.Piece>'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) ->
+    Length = X bsl N + Acc,
+    <<_:Length/binary, Rest2/binary>> = Rest,
+    'dfp_read_field_def_map<uint32,client.ReadBatchReply.Piece>'(Rest2, 0, 0, F, F@_1, F@_2, TrUserData).
+
+'skip_group_map<uint32,client.ReadBatchReply.Piece>'(Bin, _, Z2, FNum, F@_1, F@_2, TrUserData) ->
+    {_, Rest} = read_group(Bin, FNum),
+    'dfp_read_field_def_map<uint32,client.ReadBatchReply.Piece>'(Rest, 0, Z2, FNum, F@_1, F@_2, TrUserData).
+
+'skip_32_map<uint32,client.ReadBatchReply.Piece>'(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_map<uint32,client.ReadBatchReply.Piece>'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+'skip_64_map<uint32,client.ReadBatchReply.Piece>'(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_map<uint32,client.ReadBatchReply.Piece>'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
 
 'decode_msg_map<uint32,uint32>'(Bin, TrUserData) -> 'dfp_read_field_def_map<uint32,uint32>'(Bin, 0, 0, 0, id(0, TrUserData), id(0, TrUserData), TrUserData).
 
@@ -1858,6 +2438,10 @@ merge_msgs(Prev, New, MsgName, Opts) ->
         'client.LoadReply' -> 'merge_msg_client.LoadReply'(Prev, New, TrUserData);
         'client.Read' -> 'merge_msg_client.Read'(Prev, New, TrUserData);
         'client.ReadReply' -> 'merge_msg_client.ReadReply'(Prev, New, TrUserData);
+        'client.ReadBatch.Piece' -> 'merge_msg_client.ReadBatch.Piece'(Prev, New, TrUserData);
+        'client.ReadBatch' -> 'merge_msg_client.ReadBatch'(Prev, New, TrUserData);
+        'client.ReadBatchReply.Piece' -> 'merge_msg_client.ReadBatchReply.Piece'(Prev, New, TrUserData);
+        'client.ReadBatchReply' -> 'merge_msg_client.ReadBatchReply'(Prev, New, TrUserData);
         'client.Update' -> 'merge_msg_client.Update'(Prev, New, TrUserData);
         'client.UpdateReply' -> 'merge_msg_client.UpdateReply'(Prev, New, TrUserData);
         'client.Commit' -> 'merge_msg_client.Commit'(Prev, New, TrUserData);
@@ -1942,6 +2526,71 @@ merge_msgs(Prev, New, MsgName, Opts) ->
         {_, #{txId := NFtxId}} -> S5#{txId => NFtxId};
         {#{txId := PFtxId}, _} -> S5#{txId => PFtxId};
         _ -> S5
+    end.
+
+-compile({nowarn_unused_function,'merge_msg_client.ReadBatch.Piece'/3}).
+'merge_msg_client.ReadBatch.Piece'(PMsg, NMsg, TrUserData) ->
+    S1 = #{},
+    S2 = case {PMsg, NMsg} of
+             {_, #{prevLeader := NFprevLeader}} -> S1#{prevLeader => NFprevLeader};
+             {#{prevLeader := PFprevLeader}, _} -> S1#{prevLeader => PFprevLeader};
+             _ -> S1
+         end,
+    case {PMsg, NMsg} of
+        {#{keys := PFkeys}, #{keys := NFkeys}} -> S2#{keys => 'erlang_++'(PFkeys, NFkeys, TrUserData)};
+        {_, #{keys := NFkeys}} -> S2#{keys => NFkeys};
+        {#{keys := PFkeys}, _} -> S2#{keys => PFkeys};
+        {_, _} -> S2
+    end.
+
+-compile({nowarn_unused_function,'merge_msg_client.ReadBatch'/3}).
+'merge_msg_client.ReadBatch'(PMsg, NMsg, TrUserData) ->
+    S1 = #{},
+    S2 = case {PMsg, NMsg} of
+             {_, #{txId := NFtxId}} -> S1#{txId => NFtxId};
+             {#{txId := PFtxId}, _} -> S1#{txId => PFtxId};
+             _ -> S1
+         end,
+    S3 = case {PMsg, NMsg} of
+             {_, #{timestamp := NFtimestamp}} -> S2#{timestamp => NFtimestamp};
+             {#{timestamp := PFtimestamp}, _} -> S2#{timestamp => PFtimestamp};
+             _ -> S2
+         end,
+    case {PMsg, NMsg} of
+        {#{pieces := PFpieces}, #{pieces := NFpieces}} -> S3#{pieces => 'tr_merge_client.ReadBatch.pieces'(PFpieces, NFpieces, TrUserData)};
+        {_, #{pieces := NFpieces}} -> S3#{pieces => NFpieces};
+        {#{pieces := PFpieces}, _} -> S3#{pieces => PFpieces};
+        {_, _} -> S3
+    end.
+
+-compile({nowarn_unused_function,'merge_msg_client.ReadBatchReply.Piece'/3}).
+'merge_msg_client.ReadBatchReply.Piece'(PMsg, NMsg, TrUserData) ->
+    S1 = #{},
+    S2 = case {PMsg, NMsg} of
+             {_, #{ballot := NFballot}} -> S1#{ballot => NFballot};
+             {#{ballot := PFballot}, _} -> S1#{ballot => PFballot};
+             _ -> S1
+         end,
+    S3 = case {PMsg, NMsg} of
+             {_, #{servedBy := NFservedBy}} -> S2#{servedBy => NFservedBy};
+             {#{servedBy := PFservedBy}, _} -> S2#{servedBy => PFservedBy};
+             _ -> S2
+         end,
+    case {PMsg, NMsg} of
+        {#{values := PFvalues}, #{values := NFvalues}} -> S3#{values => 'erlang_++'(PFvalues, NFvalues, TrUserData)};
+        {_, #{values := NFvalues}} -> S3#{values => NFvalues};
+        {#{values := PFvalues}, _} -> S3#{values => PFvalues};
+        {_, _} -> S3
+    end.
+
+-compile({nowarn_unused_function,'merge_msg_client.ReadBatchReply'/3}).
+'merge_msg_client.ReadBatchReply'(PMsg, NMsg, TrUserData) ->
+    S1 = #{},
+    case {PMsg, NMsg} of
+        {#{payload := PFpayload}, #{payload := NFpayload}} -> S1#{payload => 'tr_merge_client.ReadBatchReply.payload'(PFpayload, NFpayload, TrUserData)};
+        {_, #{payload := NFpayload}} -> S1#{payload => NFpayload};
+        {#{payload := PFpayload}, _} -> S1#{payload => PFpayload};
+        {_, _} -> S1
     end.
 
 -compile({nowarn_unused_function,'merge_msg_client.Update'/3}).
@@ -2073,6 +2722,7 @@ merge_msgs(Prev, New, MsgName, Opts) ->
         {#{payload := {release, OPFpayload}}, #{payload := {release, ONFpayload}}} -> S2#{payload => {release, 'merge_msg_client.Release'(OPFpayload, ONFpayload, TrUserData)}};
         {#{payload := {load, OPFpayload}}, #{payload := {load, ONFpayload}}} -> S2#{payload => {load, 'merge_msg_client.Load'(OPFpayload, ONFpayload, TrUserData)}};
         {#{payload := {ping, OPFpayload}}, #{payload := {ping, ONFpayload}}} -> S2#{payload => {ping, 'merge_msg_client.ClientPing'(OPFpayload, ONFpayload, TrUserData)}};
+        {#{payload := {readBatch, OPFpayload}}, #{payload := {readBatch, ONFpayload}}} -> S2#{payload => {readBatch, 'merge_msg_client.ReadBatch'(OPFpayload, ONFpayload, TrUserData)}};
         {_, #{payload := NFpayload}} -> S2#{payload => NFpayload};
         {#{payload := PFpayload}, _} -> S2#{payload => PFpayload};
         {_, _} -> S2
@@ -2092,6 +2742,7 @@ merge_msgs(Prev, New, MsgName, Opts) ->
         {#{payload := {commit, OPFpayload}}, #{payload := {commit, ONFpayload}}} -> S2#{payload => {commit, 'merge_msg_client.CommitReply'(OPFpayload, ONFpayload, TrUserData)}};
         {#{payload := {load, OPFpayload}}, #{payload := {load, ONFpayload}}} -> S2#{payload => {load, 'merge_msg_client.LoadReply'(OPFpayload, ONFpayload, TrUserData)}};
         {#{payload := {pong, OPFpayload}}, #{payload := {pong, ONFpayload}}} -> S2#{payload => {pong, 'merge_msg_client.ClientPong'(OPFpayload, ONFpayload, TrUserData)}};
+        {#{payload := {readBatch, OPFpayload}}, #{payload := {readBatch, ONFpayload}}} -> S2#{payload => {readBatch, 'merge_msg_client.ReadBatchReply'(OPFpayload, ONFpayload, TrUserData)}};
         {_, #{payload := NFpayload}} -> S2#{payload => NFpayload};
         {#{payload := PFpayload}, _} -> S2#{payload => PFpayload};
         {_, _} -> S2
@@ -2107,6 +2758,10 @@ verify_msg(Msg, MsgName, Opts) ->
         'client.LoadReply' -> 'v_msg_client.LoadReply'(Msg, [MsgName], TrUserData);
         'client.Read' -> 'v_msg_client.Read'(Msg, [MsgName], TrUserData);
         'client.ReadReply' -> 'v_msg_client.ReadReply'(Msg, [MsgName], TrUserData);
+        'client.ReadBatch.Piece' -> 'v_msg_client.ReadBatch.Piece'(Msg, [MsgName], TrUserData);
+        'client.ReadBatch' -> 'v_msg_client.ReadBatch'(Msg, [MsgName], TrUserData);
+        'client.ReadBatchReply.Piece' -> 'v_msg_client.ReadBatchReply.Piece'(Msg, [MsgName], TrUserData);
+        'client.ReadBatchReply' -> 'v_msg_client.ReadBatchReply'(Msg, [MsgName], TrUserData);
         'client.Update' -> 'v_msg_client.Update'(Msg, [MsgName], TrUserData);
         'client.UpdateReply' -> 'v_msg_client.UpdateReply'(Msg, [MsgName], TrUserData);
         'client.Commit' -> 'v_msg_client.Commit'(Msg, [MsgName], TrUserData);
@@ -2217,6 +2872,101 @@ verify_msg(Msg, MsgName, Opts) ->
     ok;
 'v_msg_client.ReadReply'(M, Path, _TrUserData) when is_map(M) -> mk_type_error({missing_fields, [] -- maps:keys(M), 'client.ReadReply'}, M, Path);
 'v_msg_client.ReadReply'(X, Path, _TrUserData) -> mk_type_error({expected_msg, 'client.ReadReply'}, X, Path).
+
+-compile({nowarn_unused_function,'v_msg_client.ReadBatch.Piece'/3}).
+-dialyzer({nowarn_function,'v_msg_client.ReadBatch.Piece'/3}).
+'v_msg_client.ReadBatch.Piece'(#{} = M, Path, TrUserData) ->
+    case M of
+        #{prevLeader := F1} -> v_type_string(F1, [prevLeader | Path], TrUserData);
+        _ -> ok
+    end,
+    case M of
+        #{keys := F2} ->
+            if is_list(F2) ->
+                   _ = [v_type_bytes(Elem, [keys | Path], TrUserData) || Elem <- F2],
+                   ok;
+               true -> mk_type_error({invalid_list_of, bytes}, F2, [keys | Path])
+            end;
+        _ -> ok
+    end,
+    lists:foreach(fun (prevLeader) -> ok;
+                      (keys) -> ok;
+                      (OtherKey) -> mk_type_error({extraneous_key, OtherKey}, M, Path)
+                  end,
+                  maps:keys(M)),
+    ok;
+'v_msg_client.ReadBatch.Piece'(M, Path, _TrUserData) when is_map(M) -> mk_type_error({missing_fields, [] -- maps:keys(M), 'client.ReadBatch.Piece'}, M, Path);
+'v_msg_client.ReadBatch.Piece'(X, Path, _TrUserData) -> mk_type_error({expected_msg, 'client.ReadBatch.Piece'}, X, Path).
+
+-compile({nowarn_unused_function,'v_msg_client.ReadBatch'/3}).
+-dialyzer({nowarn_function,'v_msg_client.ReadBatch'/3}).
+'v_msg_client.ReadBatch'(#{} = M, Path, TrUserData) ->
+    case M of
+        #{txId := F1} -> v_type_string(F1, [txId | Path], TrUserData);
+        _ -> ok
+    end,
+    case M of
+        #{timestamp := F2} -> v_type_uint64(F2, [timestamp | Path], TrUserData);
+        _ -> ok
+    end,
+    case M of
+        #{pieces := F3} -> 'v_map<uint32,client.ReadBatch.Piece>'(F3, [pieces | Path], TrUserData);
+        _ -> ok
+    end,
+    lists:foreach(fun (txId) -> ok;
+                      (timestamp) -> ok;
+                      (pieces) -> ok;
+                      (OtherKey) -> mk_type_error({extraneous_key, OtherKey}, M, Path)
+                  end,
+                  maps:keys(M)),
+    ok;
+'v_msg_client.ReadBatch'(M, Path, _TrUserData) when is_map(M) -> mk_type_error({missing_fields, [] -- maps:keys(M), 'client.ReadBatch'}, M, Path);
+'v_msg_client.ReadBatch'(X, Path, _TrUserData) -> mk_type_error({expected_msg, 'client.ReadBatch'}, X, Path).
+
+-compile({nowarn_unused_function,'v_msg_client.ReadBatchReply.Piece'/3}).
+-dialyzer({nowarn_function,'v_msg_client.ReadBatchReply.Piece'/3}).
+'v_msg_client.ReadBatchReply.Piece'(#{} = M, Path, TrUserData) ->
+    case M of
+        #{ballot := F1} -> v_type_uint32(F1, [ballot | Path], TrUserData);
+        _ -> ok
+    end,
+    case M of
+        #{servedBy := F2} -> v_type_string(F2, [servedBy | Path], TrUserData);
+        _ -> ok
+    end,
+    case M of
+        #{values := F3} ->
+            if is_list(F3) ->
+                   _ = [v_type_bytes(Elem, [values | Path], TrUserData) || Elem <- F3],
+                   ok;
+               true -> mk_type_error({invalid_list_of, bytes}, F3, [values | Path])
+            end;
+        _ -> ok
+    end,
+    lists:foreach(fun (ballot) -> ok;
+                      (servedBy) -> ok;
+                      (values) -> ok;
+                      (OtherKey) -> mk_type_error({extraneous_key, OtherKey}, M, Path)
+                  end,
+                  maps:keys(M)),
+    ok;
+'v_msg_client.ReadBatchReply.Piece'(M, Path, _TrUserData) when is_map(M) -> mk_type_error({missing_fields, [] -- maps:keys(M), 'client.ReadBatchReply.Piece'}, M, Path);
+'v_msg_client.ReadBatchReply.Piece'(X, Path, _TrUserData) -> mk_type_error({expected_msg, 'client.ReadBatchReply.Piece'}, X, Path).
+
+-compile({nowarn_unused_function,'v_msg_client.ReadBatchReply'/3}).
+-dialyzer({nowarn_function,'v_msg_client.ReadBatchReply'/3}).
+'v_msg_client.ReadBatchReply'(#{} = M, Path, TrUserData) ->
+    case M of
+        #{payload := F1} -> 'v_map<uint32,client.ReadBatchReply.Piece>'(F1, [payload | Path], TrUserData);
+        _ -> ok
+    end,
+    lists:foreach(fun (payload) -> ok;
+                      (OtherKey) -> mk_type_error({extraneous_key, OtherKey}, M, Path)
+                  end,
+                  maps:keys(M)),
+    ok;
+'v_msg_client.ReadBatchReply'(M, Path, _TrUserData) when is_map(M) -> mk_type_error({missing_fields, [] -- maps:keys(M), 'client.ReadBatchReply'}, M, Path);
+'v_msg_client.ReadBatchReply'(X, Path, _TrUserData) -> mk_type_error({expected_msg, 'client.ReadBatchReply'}, X, Path).
 
 -compile({nowarn_unused_function,'v_msg_client.Update'/3}).
 -dialyzer({nowarn_function,'v_msg_client.Update'/3}).
@@ -2398,6 +3148,7 @@ verify_msg(Msg, MsgName, Opts) ->
         #{payload := {release, OF2}} -> 'v_msg_client.Release'(OF2, [release, payload | Path], TrUserData);
         #{payload := {load, OF2}} -> 'v_msg_client.Load'(OF2, [load, payload | Path], TrUserData);
         #{payload := {ping, OF2}} -> 'v_msg_client.ClientPing'(OF2, [ping, payload | Path], TrUserData);
+        #{payload := {readBatch, OF2}} -> 'v_msg_client.ReadBatch'(OF2, [readBatch, payload | Path], TrUserData);
         #{payload := F2} -> mk_type_error(invalid_oneof, F2, [payload | Path]);
         _ -> ok
     end,
@@ -2423,6 +3174,7 @@ verify_msg(Msg, MsgName, Opts) ->
         #{payload := {commit, OF2}} -> 'v_msg_client.CommitReply'(OF2, [commit, payload | Path], TrUserData);
         #{payload := {load, OF2}} -> 'v_msg_client.LoadReply'(OF2, [load, payload | Path], TrUserData);
         #{payload := {pong, OF2}} -> 'v_msg_client.ClientPong'(OF2, [pong, payload | Path], TrUserData);
+        #{payload := {readBatch, OF2}} -> 'v_msg_client.ReadBatchReply'(OF2, [readBatch, payload | Path], TrUserData);
         #{payload := F2} -> mk_type_error(invalid_oneof, F2, [payload | Path]);
         _ -> ok
     end,
@@ -2493,6 +3245,20 @@ v_type_bytes(B, _Path, _TrUserData) when is_binary(B) -> ok;
 v_type_bytes(B, _Path, _TrUserData) when is_list(B) -> ok;
 v_type_bytes(X, Path, _TrUserData) -> mk_type_error(bad_binary_value, X, Path).
 
+-compile({nowarn_unused_function,'v_map<uint32,client.ReadBatch.Piece>'/3}).
+-dialyzer({nowarn_function,'v_map<uint32,client.ReadBatch.Piece>'/3}).
+'v_map<uint32,client.ReadBatch.Piece>'(M, Path, TrUserData) when is_map(M) ->
+    [begin v_type_uint32(Key, [key | Path], TrUserData), 'v_msg_client.ReadBatch.Piece'(Value, [value | Path], TrUserData) end || {Key, Value} <- maps:to_list(M)],
+    ok;
+'v_map<uint32,client.ReadBatch.Piece>'(X, Path, _TrUserData) -> mk_type_error(invalid_map, X, Path).
+
+-compile({nowarn_unused_function,'v_map<uint32,client.ReadBatchReply.Piece>'/3}).
+-dialyzer({nowarn_function,'v_map<uint32,client.ReadBatchReply.Piece>'/3}).
+'v_map<uint32,client.ReadBatchReply.Piece>'(M, Path, TrUserData) when is_map(M) ->
+    [begin v_type_uint32(Key, [key | Path], TrUserData), 'v_msg_client.ReadBatchReply.Piece'(Value, [value | Path], TrUserData) end || {Key, Value} <- maps:to_list(M)],
+    ok;
+'v_map<uint32,client.ReadBatchReply.Piece>'(X, Path, _TrUserData) -> mk_type_error(invalid_map, X, Path).
+
 -compile({nowarn_unused_function,'v_map<uint32,uint32>'/3}).
 -dialyzer({nowarn_function,'v_map<uint32,uint32>'/3}).
 'v_map<uint32,uint32>'(M, Path, TrUserData) when is_map(M) ->
@@ -2535,6 +3301,24 @@ cons(Elem, Acc, _TrUserData) -> [Elem | Acc].
 -compile({nowarn_unused_function,'erlang_++'/3}).
 -compile({inline,'erlang_++'/3}).
 'erlang_++'(A, B, _TrUserData) -> A ++ B.
+-compile({inline,'tr_encode_client.ReadBatch.pieces[x]'/2}).
+'tr_encode_client.ReadBatch.pieces[x]'(X, _) -> mt_maptuple_to_pseudomsg_m(X).
+
+-compile({inline,'tr_decode_init_default_client.ReadBatchReply.payload'/2}).
+'tr_decode_init_default_client.ReadBatchReply.payload'(_, _) -> mt_empty_map_m().
+
+-compile({inline,'tr_merge_client.ReadBatchReply.payload'/3}).
+'tr_merge_client.ReadBatchReply.payload'(X1, X2, _) -> mt_merge_maps_m(X1, X2).
+
+-compile({inline,'tr_decode_repeated_finalize_client.ReadBatchReply.payload'/2}).
+'tr_decode_repeated_finalize_client.ReadBatchReply.payload'(L, TrUserData) -> id(L, TrUserData).
+
+-compile({inline,'tr_encode_client.ReadBatchReply.payload'/2}).
+'tr_encode_client.ReadBatchReply.payload'(X, _) -> mt_map_to_list_m(X).
+
+-compile({inline,'tr_decode_repeated_add_elem_client.ReadBatchReply.payload'/3}).
+'tr_decode_repeated_add_elem_client.ReadBatchReply.payload'(Elem, L, _) -> mt_add_item_m_verify_value(Elem, L).
+
 -compile({inline,'tr_decode_init_default_client.Commit.ballots'/2}).
 'tr_decode_init_default_client.Commit.ballots'(_, _) -> mt_empty_map_m().
 
@@ -2550,8 +3334,26 @@ cons(Elem, Acc, _TrUserData) -> [Elem | Acc].
 -compile({inline,'tr_decode_repeated_add_elem_client.Commit.ballots'/3}).
 'tr_decode_repeated_add_elem_client.Commit.ballots'(Elem, L, _) -> mt_add_item_m(Elem, L).
 
+-compile({inline,'tr_encode_client.ReadBatchReply.payload[x]'/2}).
+'tr_encode_client.ReadBatchReply.payload[x]'(X, _) -> mt_maptuple_to_pseudomsg_m(X).
+
 -compile({inline,'tr_encode_client.Commit.ballots[x]'/2}).
 'tr_encode_client.Commit.ballots[x]'(X, _) -> mt_maptuple_to_pseudomsg_m(X).
+
+-compile({inline,'tr_decode_init_default_client.ReadBatch.pieces'/2}).
+'tr_decode_init_default_client.ReadBatch.pieces'(_, _) -> mt_empty_map_m().
+
+-compile({inline,'tr_merge_client.ReadBatch.pieces'/3}).
+'tr_merge_client.ReadBatch.pieces'(X1, X2, _) -> mt_merge_maps_m(X1, X2).
+
+-compile({inline,'tr_decode_repeated_finalize_client.ReadBatch.pieces'/2}).
+'tr_decode_repeated_finalize_client.ReadBatch.pieces'(L, TrUserData) -> id(L, TrUserData).
+
+-compile({inline,'tr_encode_client.ReadBatch.pieces'/2}).
+'tr_encode_client.ReadBatch.pieces'(X, _) -> mt_map_to_list_m(X).
+
+-compile({inline,'tr_decode_repeated_add_elem_client.ReadBatch.pieces'/3}).
+'tr_decode_repeated_add_elem_client.ReadBatch.pieces'(Elem, L, _) -> mt_add_item_m_verify_value(Elem, L).
 
 -compile({inline,mt_maptuple_to_pseudomsg_m/1}).
 mt_maptuple_to_pseudomsg_m({K, V}) -> #{key => K, value => V}.
@@ -2567,6 +3369,12 @@ mt_empty_map_m() -> #{}.
 
 -compile({inline,mt_add_item_m/2}).
 mt_add_item_m(#{key := K, value := V}, M) -> M#{K => V}.
+
+-compile({inline,mt_add_item_m_verify_value/2}).
+mt_add_item_m_verify_value(#{key := K, value := V}, M) ->
+    if V =:= '$undef' -> error({gpb_error, missing_value});
+       true -> M#{K => V}
+    end.
 
 
 -compile({inline,mt_merge_maps_m/2}).

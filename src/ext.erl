@@ -61,7 +61,18 @@
 -opaque t() :: #coordinator{}.
 -opaque tx() :: #transaction{}.
 
--opaque read_req_id() :: {read, shackle:external_request_id(), index_node()}.
+-type read_batch_pieces() :: #{partition_id()=> ext_client_proto:'client.ReadBatch.Piece'()}.
+-type key_pos_index() :: #{ {partition_id(), non_neg_integer()} => binary() }.
+-type read_batch_req_id() :: {
+    read_batch,
+    shackle:external_request_id(),
+    index_node(),
+    key_pos_index(),
+    #{partition_id() => []}
+}.
+
+-opaque read_req_id() :: {read, shackle:external_request_id(), index_node()}
+                       | read_batch_req_id().
 -opaque update_req_id() :: {update, shackle:external_request_id(), index_node()}.
 -opaque commit_req_id() :: {commit, shackle:external_request_id()} | empty_commit.
 
@@ -205,6 +216,14 @@ release(
     ext_shackle_transport:release(maps:get(Idx, Pools), TxId, maps:keys(Partitions)).
 
 -spec async_read(t(), tx(), binary()) -> {ok, read_req_id()}.
+async_read(Coord, Tx, Keys) when is_list(Keys) ->
+    case Keys of
+        [ Key ] ->
+            async_read(Coord, Tx, Key);
+        [ _ | _ ] ->
+            async_multi_read(Coord, Tx, Keys)
+    end;
+
 async_read(
     #coordinator{ring=Ring, conn_pool=Pools},
     Tx=#transaction{timestamp=Ts, id=TxId, leaders=Leaders},
@@ -216,7 +235,16 @@ async_read(
     {ok, ReqId} = ext_shackle_transport:read_request(Pool, LeaderId, TxId, Ts, Key),
     {ok, {read, ReqId, Idx}}.
 
--spec await_read(t(), tx(), read_req_id()) -> {ok, binary(), tx()} | {error, tx()}.
+-spec await_read(Coordinator, Tx0, ReadReq) -> {ok, Value, Tx}
+                                             | {ok, ValueMap, Tx}
+                                             | {error, Tx} when
+    Coordinator :: t(),
+    Tx0 :: tx(),
+    ReadReq :: read_req_id(),
+    Value :: binary(),
+    ValueMap :: #{binary() => binary()},
+    Tx :: tx().
+
 await_read(
     _,
     Tx=#transaction{ballots=Ballots, leaders=Leaders, partitions=Partitions},
@@ -232,6 +260,39 @@ await_read(
                                   leaders=Leaders#{P => ShardLeader}},
 
             {ok, Value, confirm_coord_index_node(Tx1, Idx)}
+    end;
+
+await_read(
+    _,
+    Tx=#transaction{partitions=Partitions},
+    {read_batch, ReqId, Idx, KeyPosIndex, PendingPartitions}
+) ->
+
+    Tx0 = Tx#transaction{partitions=maps:merge(Partitions, PendingPartitions)},
+    case shackle:receive_response(ReqId) of
+        error ->
+            {error, Tx0};
+
+        {ok, Payload} ->
+            {Tx1, ValueMap} =
+                maps:fold(
+                    fun(
+                        Partition,
+                        #{ballot := Ballot, servedBy := ShardLeader, values := Values},
+                        {TxAcc, ValueAcc}
+                    ) ->
+                        {
+                            TxAcc#transaction{
+                                ballots = (TxAcc#transaction.ballots)#{Partition => Ballot},
+                                leaders = (TxAcc#transaction.leaders)#{Partition => ShardLeader}
+                            },
+                            fill_from_key_index(Partition, Values, KeyPosIndex, ValueAcc)
+                        }
+                    end,
+                    {Tx0, #{}},
+                    Payload
+                ),
+            {ok, ValueMap, confirm_coord_index_node(Tx1, Idx)}
     end.
 
 -spec async_operation(t(), tx(), binary(), operation()) -> {ok, update_req_id()}.
@@ -264,6 +325,18 @@ await_operation(
 
             {ok, confirm_coord_index_node(Tx1, Idx)}
     end.
+
+async_multi_read(
+    #coordinator{ring=Ring, conn_pool=Pools},
+    Tx=#transaction{id=TxId, timestamp=Ts, leaders=Leaders},
+    Keys=[HeadKey | _]
+) ->
+    {Pieces, Pending} = assemble_pieces(Ring, Leaders, Keys),
+    KeyIndex = build_key_index(Pieces),
+    CoordIdx = ext_ring:get_key_location(Ring, HeadKey),
+    CoordPool = maps:get(get_coord_node(Tx, CoordIdx), Pools),
+    {ok, ReqId} = ext_shackle_transport:read_batch_request(CoordPool, TxId, Ts, Pieces),
+    {ok, {read_batch, ReqId, CoordIdx, KeyIndex, Pending}}.
 
 -spec sync_read(t(), tx(), binary()) -> {ok, binary(), tx()} | {error, tx()}.
 sync_read(Coord, Tx, Key) ->
@@ -304,6 +377,104 @@ get_coord_node(#transaction{init_index_node={_, Node}}, _) ->
 -spec confirm_coord_index_node(tx(), index_node()) -> tx().
 confirm_coord_index_node(Tx=#transaction{init_index_node=undefined}, IdxNode) -> Tx#transaction{init_index_node=IdxNode};
 confirm_coord_index_node(Tx, _) -> Tx.
+
+%%====================================================================
+%% Read Batch Util
+%%====================================================================
+
+-spec assemble_pieces(Ring, Leaders, Keys) -> {Pieces, PendingPartitions} when
+    Ring :: ext_ring:ext_ring(),
+    Leaders :: #{partition_id() => replica_id()},
+    Keys :: [binary(), ...],
+    Pieces :: read_batch_pieces(),
+    PendingPartitions :: #{partition_id() => []}.
+
+assemble_pieces(Ring, Leaders, Keys) ->
+    assemble_pieces(Ring, Leaders, Keys, #{}, #{}).
+
+-spec assemble_pieces(Ring, Leaders, Keys, PieceAcc, PendingAcc) -> {Pieces, PendingPartitions} when
+    Ring :: ext_ring:ext_ring(),
+    Leaders :: #{partition_id() => replica_id()},
+    Keys :: [binary(), ...],
+    PieceAcc :: read_batch_pieces(),
+    PendingAcc :: #{partition_id() => []},
+    Pieces :: read_batch_pieces(),
+    PendingPartitions :: #{partition_id() => []}.
+
+assemble_pieces(_Ring, _Leaders, [], PieceAcc, PendingAcc) ->
+    {PieceAcc, PendingAcc};
+
+assemble_pieces(Ring, Leaders, [Key | Rest], Acc0, PendingAcc) ->
+    {Partition, _} = ext_ring:get_key_location(Ring, Key),
+    Acc =
+        case Acc0 of
+            #{Partition := M=#{keys := Keys}} ->
+                Acc0#{Partition => M#{
+                    keys => Keys ++ [Key]
+                }};
+
+            _ ->
+                PartitionMap =
+                    case Leaders of
+                        #{Partition := LeaderId} ->
+                            #{prevLeader => LeaderId, keys => [Key]};
+                        _ ->
+                            #{keys => [Key]}
+                    end,
+                Acc0#{Partition => PartitionMap}
+        end,
+    assemble_pieces(Ring, Leaders, Rest, Acc, PendingAcc#{Partition => []}).
+
+-spec build_key_index(read_batch_pieces()) -> key_pos_index().
+build_key_index(PartitionMap) ->
+    maps:fold(
+        fun(Partition, #{keys := KeyList}, Acc) ->
+            build_partition_index(Partition, KeyList, Acc)
+        end,
+        #{},
+        PartitionMap
+    ).
+
+-spec build_partition_index(
+    Partition :: partition_id(),
+    Keys :: [binary(), ...],
+    Acc :: key_pos_index()
+) -> key_pos_index().
+build_partition_index(Partition, Keys, Acc) ->
+    {Idx, _} =
+        lists:foldl(
+            fun(Key, {InnerAcc, N}) ->
+                {
+                    InnerAcc#{{Partition, N} => Key},
+                    N + 1
+                }
+            end,
+            {Acc, 0},
+            Keys
+        ),
+    Idx.
+
+-spec fill_from_key_index(Partition, Values, Index, Acc0) -> Acc when
+    Partition :: partition_id(),
+    Values :: [binary(), ...],
+    Index :: key_pos_index(),
+    Acc0 :: #{binary() => binary()},
+    Acc :: #{binary() => binary()}.
+
+fill_from_key_index(Partition, Values, Index, Acc0) ->
+    {ValueMap, _} =
+        lists:foldl(
+            fun(Value, {Acc, N}) ->
+                Key = maps:get({Partition, N}, Index),
+                {
+                    Acc#{Key => Value},
+                    N+1
+                }
+            end,
+            {Acc0, 0},
+            Values
+        ),
+    ValueMap.
 
 %%====================================================================
 %% Util functions

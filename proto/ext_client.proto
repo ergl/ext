@@ -26,6 +26,29 @@ message ReadReply {
     optional string txId = 5;
 }
 
+message ReadBatch {
+    message Piece {
+        optional string prevLeader = 1;
+        repeated bytes keys = 2;
+    }
+
+    string txId = 1;
+    uint64 timestamp = 2;
+    map<uint32, Piece> pieces = 4;
+}
+
+message ReadBatchReply {
+    message Piece {
+        uint32 ballot = 1;
+        string servedBy = 2;
+        // Same order as keys in ReadBatch.Piece.Keys
+        repeated bytes values = 3;
+    }
+
+    // If empty, this signifies an error
+    map<uint32, Piece> payload = 1;
+}
+
 message Update {
     // If empty, this is the first request at the partition
     optional string prevLeader = 1;
@@ -93,6 +116,7 @@ message Request {
         Release release = 5;
         Load load = 6;
         ClientPing ping = 7;
+        ReadBatch readBatch = 9;
     }
 }
 
@@ -104,5 +128,6 @@ message Response {
         CommitReply commit = 4;
         LoadReply load = 5;
         ClientPong pong = 6;
+        ReadBatchReply readBatch = 7;
     }
 }

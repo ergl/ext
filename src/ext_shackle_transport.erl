@@ -3,6 +3,7 @@
 -behavior(shackle_client).
 
 -export([read_request/5,
+         read_batch_request/4,
          update_request/6,
          commit_request/6,
          release/3]).
@@ -36,6 +37,16 @@ ping(Pool, TxId) ->
 %% When awaited, returns {ok, Ballot :: ballot(), ServedBy :: replica_id(), Data :: binary()} | error.
 read_request(Pool, PrevLeader, TxId, Timestamp, Key) ->
     shackle:cast(Pool, {read, PrevLeader, TxId, Timestamp, Key}, self(), infinity).
+
+-spec read_batch_request(
+    Pool :: shackle_pool(),
+    TxId :: binary(),
+    Timestamp :: timestamp(),
+    Pieces :: ext:read_batch_pieces()
+) -> {ok, shackle:external_request_id()}.
+%% When awaited, returns {ok, #{partition_id() => 'client.ReadBatchReply.Piece'}} | error.
+read_batch_request(Pool, TxId, Timestamp, Pieces) ->
+    shackle:cast(Pool, {read_batch, TxId, Timestamp, Pieces}, self(), infinity).
 
 -spec update_request(
     Pool :: shackle_pool(),
@@ -85,6 +96,10 @@ handle_request({read, PrevLeader, TxId, Timestamp, Key}, S=#state{req_counter=Re
     Msg = case PrevLeader of empty -> Msg0; _ -> Msg0#{prevLeader => PrevLeader} end,
     {ok, Req, make_request(Req, {read, Msg}), incr_req(S)};
 
+handle_request({read_batch, TxId, Timestamp, Pieces}, S=#state{req_counter=Req}) ->
+    Msg = #{txId => TxId, timestamp => Timestamp, pieces => Pieces},
+    {ok, Req, make_request(Req, {readBatch, Msg}), incr_req(S)};
+
 handle_request({update, PrevLeader, TxId, Timestamp, Key, Operation}, S=#state{req_counter=Req}) ->
     Msg0 = #{txId => TxId, timestamp => Timestamp, key => Key, operation => Operation},
     Msg = case PrevLeader of empty -> Msg0; _ -> Msg0#{prevLeader => PrevLeader} end,
@@ -131,6 +146,13 @@ decode_payload({update, Map}) ->
     case Map of
         #{ballot := B, servedBy := L, isError := false} -> {ok, B, L};
         _ -> error
+    end;
+decode_payload(({readBatch, Map})) ->
+    case Map of
+        #{payload := Payload} when map_size(Payload) =/= 0 ->
+            {ok, Payload};
+        _ ->
+            error
     end;
 decode_payload({commit, #{commit := true}}) -> ok;
 decode_payload({commit, #{commit := false}}) -> error;
