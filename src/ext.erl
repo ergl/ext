@@ -54,8 +54,8 @@
     init_index_node = undefined :: undefined | index_node(),
 
     ballots = #{} :: #{partition_id() => ballot()},
-    leaders = #{} :: #{index_node() => replica_id()},
-    partitions = #{} :: #{index_node() => []}
+    leaders = #{} :: #{partition_id() => replica_id()},
+    partitions = #{} :: #{partition_id() => []}
 }).
 
 -opaque t() :: #coordinator{}.
@@ -188,53 +188,70 @@ commit(Coord, Tx, Timeout) ->
 release(_, #transaction{init_index_node=undefined}) ->
     %% If the transaction never read anything, return
     ok;
-release(#coordinator{conn_pool=Pools}, #transaction{id=TxId, init_index_node={_, Idx}, partitions=Partitions}) ->
-    PartitionList = [ Partition || {Partition, _} <- maps:keys(Partitions) ],
-    ext_shackle_transport:release(maps:get(Idx, Pools), TxId, PartitionList).
+release(
+    #coordinator{conn_pool=Pools},
+    #transaction{id=TxId, init_index_node={_, Idx},
+    partitions=Partitions
+}) ->
+    ext_shackle_transport:release(maps:get(Idx, Pools), TxId, maps:keys(Partitions)).
 
 -spec async_read(t(), tx(), binary()) -> {ok, read_req_id()}.
-async_read(#coordinator{ring=Ring, conn_pool=Pools},
-           Tx=#transaction{timestamp=Ts, id=TxId, leaders=Leaders},
-           Key) ->
-    Idx = ext_ring:get_key_location(Ring, Key),
+async_read(
+    #coordinator{ring=Ring, conn_pool=Pools},
+    Tx=#transaction{timestamp=Ts, id=TxId, leaders=Leaders},
+    Key
+) ->
+    {Partition, _}=Idx = ext_ring:get_key_location(Ring, Key),
+    LeaderId = maps:get(Partition, Leaders, empty),
     Pool = maps:get(get_coord_node(Tx, Idx), Pools),
-    {ok, ReqId} = ext_shackle_transport:read_request(Pool, maps:get(Idx, Leaders, empty), TxId, Ts, Key),
+    {ok, ReqId} = ext_shackle_transport:read_request(Pool, LeaderId, TxId, Ts, Key),
     {ok, {read, ReqId, Idx}}.
 
 -spec await_read(t(), tx(), read_req_id()) -> {ok, binary(), tx()} | {error, tx()}.
-await_read(_, Tx=#transaction{ballots=Ballots, leaders=Leaders, partitions=Partitions}, {read, ReqId, Idx={P, _}}) ->
-    Tx0 = Tx#transaction{partitions=Partitions#{Idx => []}},
+await_read(
+    _,
+    Tx=#transaction{ballots=Ballots, leaders=Leaders, partitions=Partitions},
+    {read, ReqId, Idx={P, _}}
+) ->
+    Tx0 = Tx#transaction{partitions=Partitions#{P => []}},
     case shackle:receive_response(ReqId) of
         error ->
             {error, Tx0};
 
         {ok, Ballot, ShardLeader, Value} ->
             Tx1 = Tx0#transaction{ballots=Ballots#{P => Ballot},
-                                  leaders=Leaders#{Idx => ShardLeader}},
+                                  leaders=Leaders#{P => ShardLeader}},
 
             {ok, Value, confirm_coord_index_node(Tx1, Idx)}
     end.
 
 -spec async_operation(t(), tx(), binary(), operation()) -> {ok, update_req_id()}.
-async_operation(#coordinator{ring=Ring, conn_pool=Pools},
-                Tx=#transaction{timestamp=Ts, id=TxId, leaders=Leaders},
-                Key,
-                Operation) ->
-    Idx = ext_ring:get_key_location(Ring, Key),
+async_operation(
+    #coordinator{ring=Ring, conn_pool=Pools},
+    Tx=#transaction{timestamp=Ts, id=TxId, leaders=Leaders},
+    Key,
+    Operation
+) ->
+    {Partition, _}=Idx = ext_ring:get_key_location(Ring, Key),
+    LeaderId = maps:get(Partition, Leaders, empty),
     Pool = maps:get(get_coord_node(Tx, Idx), Pools),
-    {ok, ReqId} = ext_shackle_transport:update_request(Pool, maps:get(Idx, Leaders, empty), TxId, Ts, Key, Operation),
+    {ok, ReqId} = ext_shackle_transport:update_request(Pool, LeaderId, TxId, Ts, Key, Operation),
     {ok, {update, ReqId, Idx}}.
 
 -spec await_operation(t(), tx(), update_req_id()) -> {ok, tx()} | {error, tx()}.
-await_operation(_, Tx=#transaction{ballots=Ballots, leaders=Leaders, partitions=Partitions}, {update, ReqId, Idx={P, _}}) ->
-    Tx0 = Tx#transaction{partitions=Partitions#{Idx => []}},
+await_operation(
+    _,
+    Tx=#transaction{ballots=Ballots, leaders=Leaders, partitions=Partitions},
+    {update, ReqId, Idx={P, _}}
+) ->
+    Tx0 = Tx#transaction{partitions=Partitions#{P => []}},
     case shackle:receive_response(ReqId) of
         error ->
             {error, Tx0};
 
         {ok, Ballot, ShardLeader} ->
             Tx1 = Tx0#transaction{ballots=Ballots#{P => Ballot},
-                                  leaders=Leaders#{Idx => ShardLeader}},
+                                  leaders=Leaders#{P => ShardLeader}},
 
             {ok, confirm_coord_index_node(Tx1, Idx)}
     end.
@@ -254,9 +271,11 @@ sync_operation(Coord, Tx, Key, Op) ->
     await_operation(Coord, Tx, Req).
 
 -spec ping(t(), tx(), binary()) -> ok.
-ping(#coordinator{ring=Ring, conn_pool=Pools},
-     Tx=#transaction{id=TxId},
-     Key) ->
+ping(
+    #coordinator{ring=Ring, conn_pool=Pools},
+    Tx=#transaction{id=TxId},
+    Key
+) ->
     Idx = ext_ring:get_key_location(Ring, Key),
     Pool = maps:get(get_coord_node(Tx, Idx), Pools),
     {ok, ReqId} = ext_shackle_transport:ping(Pool, TxId),
