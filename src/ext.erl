@@ -147,11 +147,20 @@ async_commit(_, #transaction{init_index_node=undefined}, _) ->
     %% If the transaction never read anything, we bypass 2PC
     {ok, empty_commit};
 
-async_commit(#coordinator{conn_pool=Pools},
-             #transaction{id=TxId, init_index_node={CoordPartition, Idx}, timestamp=Ts, ballots=Ballots},
-             Timeout) ->
+async_commit(
+    #coordinator{conn_pool=Pools},
+    #transaction{id=TxId, init_index_node={CoordPartition, Idx}, timestamp=Ts, ballots=Ballots},
+    Timeout
+) ->
     Pool = maps:get(Idx, Pools),
-    {ok, ReqId} = ext_shackle_transport:commit_request(Pool, TxId, CoordPartition, Ts, Ballots, Timeout),
+    {ok, ReqId} = ext_shackle_transport:commit_request(
+        Pool,
+        TxId,
+        CoordPartition,
+        Ts,
+        Ballots,
+        Timeout
+    ),
     {ok, {commit, ReqId}}.
 
 -spec await_commit(t(), commit_req_id()) -> ok | error.
