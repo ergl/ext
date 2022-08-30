@@ -112,7 +112,7 @@ terminate(_State) -> ok.
 
 %% Util
 
--spec make_request(non_neg_integer(), #{}) -> binary().
+-spec make_request(non_neg_integer(), {atom(), #{_ => _}}) -> binary().
 make_request(Req, Payload) ->
     ext_client_proto:encode_msg(#{seq => Req, payload => Payload}, 'client.Request').
 
