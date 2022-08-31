@@ -17,6 +17,7 @@
 
 %% Sync read / update API
 -export([sync_read/3,
+         sync_update/3,
          sync_update/4,
          sync_operation/4]).
 
@@ -24,7 +25,9 @@
 -export([async_read/3,
          await_read/3,
          async_operation/4,
-         await_operation/3]).
+         await_operation/3,
+         async_multi_read/3,
+         async_multi_update/3]).
 
 %% Commit / Release API
 -export([async_commit/3,
@@ -61,7 +64,9 @@
 -opaque t() :: #coordinator{}.
 -opaque tx() :: #transaction{}.
 
--type read_batch_pieces() :: #{partition_id()=> ext_client_proto:'client.ReadBatch.Piece'()}.
+-type read_batch_pieces() :: #{partition_id() := ext_client_proto:'client.ReadBatch.Piece'()}.
+-type update_batch_pieces() :: #{partition_id() := ext_client_proto:'client.UpdateBatch.Piece'()}.
+
 -type key_pos_index() :: #{ {partition_id(), non_neg_integer()} => binary() }.
 -type read_batch_req_id() :: {
     read_batch,
@@ -71,12 +76,19 @@
     #{partition_id() => []}
 }.
 
+
 -opaque read_req_id() :: {read, shackle:external_request_id(), index_node()}
                        | read_batch_req_id().
 -opaque update_req_id() :: {update, shackle:external_request_id(), index_node()}.
+-opaque update_batch_req_id() :: {
+    update_batch,
+    shackle:external_request_id(),
+    index_node(),
+    #{partition_id() => []}
+}.
 -opaque commit_req_id() :: {commit, shackle:external_request_id()} | empty_commit.
 
--export_type([t/0, tx/0, read_req_id/0, update_req_id/0, commit_req_id/0]).
+-export_type([t/0, tx/0, read_req_id/0, update_req_id/0, update_batch_req_id/0, commit_req_id/0]).
 
 %%====================================================================
 %% Library APP functions
@@ -215,7 +227,7 @@ release(
 }) ->
     ext_shackle_transport:release(maps:get(Idx, Pools), TxId, maps:keys(Partitions)).
 
--spec async_read(t(), tx(), binary()) -> {ok, read_req_id()}.
+-spec async_read(t(), tx(), binary() | [binary(), ...]) -> {ok, read_req_id()}.
 async_read(Coord, Tx, Keys) when is_list(Keys) ->
     case Keys of
         [ Key ] ->
@@ -331,17 +343,72 @@ async_multi_read(
     Tx=#transaction{id=TxId, timestamp=Ts, leaders=Leaders},
     Keys=[HeadKey | _]
 ) ->
-    {Pieces, Pending} = assemble_pieces(Ring, Leaders, Keys),
+    {Pieces, Pending} = assemble_read_pieces(Ring, Leaders, Keys),
     KeyIndex = build_key_index(Pieces),
     CoordIdx = ext_ring:get_key_location(Ring, HeadKey),
     CoordPool = maps:get(get_coord_node(Tx, CoordIdx), Pools),
     {ok, ReqId} = ext_shackle_transport:read_batch_request(CoordPool, TxId, Ts, Pieces),
     {ok, {read_batch, ReqId, CoordIdx, KeyIndex, Pending}}.
 
+-spec async_multi_update(Coordinator, TxId, Updates) -> {ok, ReqId} when
+    Coordinator :: t(),
+    TxId :: tx(),
+    Updates :: [{binary(), binary()}],
+    ReqId :: update_batch_req_id().
+
+async_multi_update(
+    #coordinator{ring=Ring, conn_pool=Pools},
+    Tx=#transaction{id=TxId, timestamp=Ts, leaders=Leaders},
+    Updates = [ {HeadKey, _} | _ ]
+) when is_list(Updates) ->
+    {Pieces, Pending} = assemble_update_pieces(Ring, Leaders, Updates),
+    CoordIdx = ext_ring:get_key_location(Ring, HeadKey),
+    CoordPool = maps:get(get_coord_node(Tx, CoordIdx), Pools),
+    {ok, ReqId} = ext_shackle_transport:update_batch_request(CoordPool, TxId, Ts, Pieces),
+    {ok, {update_batch, ReqId, CoordIdx, Pending}}.
+
+-spec await_multi_update(Coordinator, tx(), ReqId) -> {ok, tx()} | {error, tx()} when
+    Coordinator :: t(),
+    ReqId :: update_batch_req_id().
+
+await_multi_update(
+    _,
+    Tx=#transaction{partitions=Partitions},
+    {update_batch, ReqId, Idx, PendingPartitions}
+) ->
+    Tx0 = Tx#transaction{partitions=maps:merge(Partitions, PendingPartitions)},
+    case shackle:receive_response(ReqId) of
+        error ->
+            {error, Tx0};
+
+        {ok, Payload} ->
+            Tx1 =
+                maps:fold(
+                    fun(
+                        Partition,
+                        #{ballot := Ballot, servedBy := ShardLeader},
+                        TxAcc
+                    ) ->
+                        TxAcc#transaction{
+                            ballots = (TxAcc#transaction.ballots)#{Partition => Ballot},
+                            leaders = (TxAcc#transaction.leaders)#{Partition => ShardLeader}
+                        }
+                    end,
+                    Tx0,
+                    Payload
+                ),
+            {ok, confirm_coord_index_node(Tx1, Idx)}
+    end.
+
 -spec sync_read(t(), tx(), binary()) -> {ok, binary(), tx()} | {error, tx()}.
 sync_read(Coord, Tx, Key) ->
     {ok, Req} = async_read(Coord, Tx, Key),
     await_read(Coord, Tx, Req).
+
+-spec sync_update(t(), tx(), [{binary(), binary()}]) -> {ok, tx()} | {error, tx()}.
+sync_update(Coord, Tx, Updates) ->
+    {ok, Req} = async_multi_update(Coord, Tx, Updates),
+    await_multi_update(Coord, Tx, Req).
 
 -spec sync_update(t(), tx(), binary(), binary()) -> {ok, tx()} | {error, tx()}.
 sync_update(Coord, Tx, Key, Value) ->
@@ -382,17 +449,17 @@ confirm_coord_index_node(Tx, _) -> Tx.
 %% Read Batch Util
 %%====================================================================
 
--spec assemble_pieces(Ring, Leaders, Keys) -> {Pieces, PendingPartitions} when
+-spec assemble_read_pieces(Ring, Leaders, Keys) -> {Pieces, PendingPartitions} when
     Ring :: ext_ring:ext_ring(),
     Leaders :: #{partition_id() => replica_id()},
     Keys :: [binary(), ...],
     Pieces :: read_batch_pieces(),
     PendingPartitions :: #{partition_id() => []}.
 
-assemble_pieces(Ring, Leaders, Keys) ->
-    assemble_pieces(Ring, Leaders, Keys, #{}, #{}).
+assemble_read_pieces(Ring, Leaders, Keys) ->
+    assemble_read_pieces(Ring, Leaders, Keys, #{}, #{}).
 
--spec assemble_pieces(Ring, Leaders, Keys, PieceAcc, PendingAcc) -> {Pieces, PendingPartitions} when
+-spec assemble_read_pieces(Ring, Leaders, Keys, PieceAcc, PendingAcc) -> {Pieces, PendingPartitions} when
     Ring :: ext_ring:ext_ring(),
     Leaders :: #{partition_id() => replica_id()},
     Keys :: [binary(), ...],
@@ -401,10 +468,10 @@ assemble_pieces(Ring, Leaders, Keys) ->
     Pieces :: read_batch_pieces(),
     PendingPartitions :: #{partition_id() => []}.
 
-assemble_pieces(_Ring, _Leaders, [], PieceAcc, PendingAcc) ->
+assemble_read_pieces(_Ring, _Leaders, [], PieceAcc, PendingAcc) ->
     {PieceAcc, PendingAcc};
 
-assemble_pieces(Ring, Leaders, [Key | Rest], Acc0, PendingAcc) ->
+assemble_read_pieces(Ring, Leaders, [Key | Rest], Acc0, PendingAcc) ->
     {Partition, _} = ext_ring:get_key_location(Ring, Key),
     Acc =
         case Acc0 of
@@ -423,7 +490,7 @@ assemble_pieces(Ring, Leaders, [Key | Rest], Acc0, PendingAcc) ->
                     end,
                 Acc0#{Partition => PartitionMap}
         end,
-    assemble_pieces(Ring, Leaders, Rest, Acc, PendingAcc#{Partition => []}).
+    assemble_read_pieces(Ring, Leaders, Rest, Acc, PendingAcc#{Partition => []}).
 
 -spec build_key_index(read_batch_pieces()) -> key_pos_index().
 build_key_index(PartitionMap) ->
@@ -475,6 +542,53 @@ fill_from_key_index(Partition, Values, Index, Acc0) ->
             Values
         ),
     ValueMap.
+
+%%====================================================================
+%% Update Batch Util
+%%====================================================================
+
+-spec assemble_update_pieces(Ring, Leaders, Updates) -> {Pieces, PendingPartitions} when
+    Ring :: ext_ring:ext_ring(),
+    Leaders :: #{partition_id() => replica_id()},
+    Updates :: [{binary(), binary()}],
+    Pieces :: update_batch_pieces(),
+    PendingPartitions :: #{partition_id() => []}.
+
+assemble_update_pieces(Ring, Leaders, Updates) ->
+    assemble_update_pieces(Ring, Leaders, Updates, #{}, #{}).
+
+-spec assemble_update_pieces(Ring, Leaders, Updates, PieceAcc, PendingAcc) -> {Pieces, PendingPartitions} when
+    Ring :: ext_ring:ext_ring(),
+    Leaders :: #{partition_id() => replica_id()},
+    Updates :: [{binary(), binary()}],
+    PieceAcc :: update_batch_pieces(),
+    PendingAcc :: #{partition_id() => []},
+    Pieces :: update_batch_pieces(),
+    PendingPartitions :: #{partition_id() => []}.
+
+assemble_update_pieces(_Ring, _Leaders, [], PieceAcc, PendingAcc) ->
+    {PieceAcc, PendingAcc};
+
+assemble_update_pieces(Ring, Leaders, [{Key, Value} | Rest], Acc0, PendingAcc) ->
+    {Partition, _} = ext_ring:get_key_location(Ring, Key),
+    Acc =
+        case Acc0 of
+            #{Partition := M=#{updates := Keys}} ->
+                Acc0#{Partition => M#{
+                    updates => Keys ++ [#{key => Key, data => Value}]
+                }};
+
+            _ ->
+                PartitionMap =
+                    case Leaders of
+                        #{Partition := LeaderId} ->
+                            #{prevLeader => LeaderId, keys => [Key]};
+                        _ ->
+                            #{updates => [#{key => Key, data => Value}]}
+                    end,
+                Acc0#{Partition => PartitionMap}
+        end,
+    assemble_update_pieces(Ring, Leaders, Rest, Acc, PendingAcc#{Partition => []}).
 
 %%====================================================================
 %% Util functions

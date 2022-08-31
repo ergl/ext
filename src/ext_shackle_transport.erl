@@ -5,6 +5,7 @@
 -export([read_request/5,
          read_batch_request/4,
          update_request/6,
+         update_batch_request/4,
          commit_request/6,
          release/3]).
 
@@ -60,6 +61,16 @@ read_batch_request(Pool, TxId, Timestamp, Pieces) ->
 update_request(Pool, PrevLeader, TxId, Timestamp, Key, Operation) ->
     shackle:cast(Pool, {update, PrevLeader, TxId, Timestamp, Key, Operation}, self(), infinity).
 
+-spec update_batch_request(Pool, TxId, Timestamp, Pieces) -> {ok, ReqId} when
+    Pool :: shackle_pool(),
+    TxId :: binary(),
+    Timestamp :: timestamp(),
+    Pieces :: ext:update_batch_pieces(),
+    ReqId :: shackle:external_request_id().
+
+update_batch_request(Pool, TxId, Timestamp, Pieces) ->
+    shackle:cast(Pool, {update_batch, TxId, Timestamp, Pieces}, self(), infinity).
+
 -spec commit_request(
     Pool :: shackle_pool(),
     TxId :: binary(),
@@ -105,6 +116,10 @@ handle_request({update, PrevLeader, TxId, Timestamp, Key, Operation}, S=#state{r
     Msg = case PrevLeader of empty -> Msg0; _ -> Msg0#{prevLeader => PrevLeader} end,
     {ok, Req, make_request(Req, {update, Msg}), incr_req(S)};
 
+handle_request({update_batch, TxId, Timestamp, Pieces}, S=#state{req_counter=Req}) ->
+    Msg = #{txId => TxId, timestamp => Timestamp, pieces => Pieces},
+    {ok, Req, make_request(Req, {updateBatch, Msg}), incr_req(S)};
+
 handle_request({commit, TxId, CoordPartition, Timestamp, Ballots}, S=#state{req_counter=Req}) ->
     Msg = #{txId => TxId, timestamp => Timestamp, ballots => Ballots, coordPartition => CoordPartition},
     {ok, Req, make_request(Req, {commit, Msg}), incr_req(S)};
@@ -148,6 +163,13 @@ decode_payload({update, Map}) ->
         _ -> error
     end;
 decode_payload(({readBatch, Map})) ->
+    case Map of
+        #{payload := Payload} when map_size(Payload) =/= 0 ->
+            {ok, Payload};
+        _ ->
+            error
+    end;
+decode_payload(({updateBatch, Map})) ->
     case Map of
         #{payload := Payload} when map_size(Payload) =/= 0 ->
             {ok, Payload};

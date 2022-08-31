@@ -81,6 +81,31 @@ message UpdateReply {
     optional string txId = 4;
 }
 
+message WriteEntry {
+    bytes key = 1;
+    bytes data = 2;
+}
+
+message UpdateBatch {
+    message Piece {
+        optional string prevLeader = 1;
+        repeated WriteEntry updates = 2;
+    }
+
+    string txId = 1;
+    uint64 timestamp = 2;
+    map<uint32, Piece> pieces = 4;
+}
+
+message UpdateBatchReply {
+    message Piece {
+        uint32 ballot = 1;
+        string servedBy = 2;
+    }
+    // If empty, this signifies an error
+    map<uint32, Piece> payload = 1;
+}
+
 message Commit {
     string txId = 1;
     map<uint32, uint32> ballots = 2;
@@ -117,6 +142,7 @@ message Request {
         Load load = 6;
         ClientPing ping = 7;
         ReadBatch readBatch = 9;
+        UpdateBatch updateBatch = 10;
     }
 }
 
@@ -129,5 +155,6 @@ message Response {
         LoadReply load = 5;
         ClientPong pong = 6;
         ReadBatchReply readBatch = 7;
+        UpdateBatchReply updateBatch = 8;
     }
 }
